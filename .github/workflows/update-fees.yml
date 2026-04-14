@@ -1,0 +1,36 @@
+name: Update Fee Constants
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Weekly on Monday at 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Fetch and update fee constants
+        run: node scripts/update-fees.mjs
+      - name: Check for changes
+        id: diff
+        run: |
+          git diff --exit-code src/lib/constants.ts || echo "changed=true" >> $GITHUB_OUTPUT
+      - name: Create PR with updated constants
+        if: steps.diff.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: 'chore: update fee constants from DPP source'
+          commit-message: 'chore: update fee constants from DPP source'
+          body: 'Automated update of fee constants from rs-platform-version source.'
+          branch: auto/update-fee-constants
+          delete-branch: true
