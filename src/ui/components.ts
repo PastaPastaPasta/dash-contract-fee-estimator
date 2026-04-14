@@ -21,7 +21,7 @@ export function renderApp(container: HTMLElement): {
       <h1>Dash Contract Fee Estimator</h1>
       <div class="fee-source">
         <span class="badge" id="fee-badge">bundled</span>
-        <span class="fee-label">Fee constants: v2 (protocol 9)</span>
+        <a class="fee-label" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee constants: v2 (protocol 9)</a>
       </div>
     </header>
 
@@ -70,6 +70,26 @@ export function renderApp(container: HTMLElement): {
       </table>
 
       <div id="summary-section" class="summary-section"></div>
+
+      <div class="sources-section">
+        <h3>Fee Reference</h3>
+        <table class="constants-table">
+          <thead>
+            <tr>
+              <th>Fee Type</th>
+              <th class="num">Credits</th>
+              <th class="num">Dash</th>
+            </tr>
+          </thead>
+          <tbody id="constants-tbody"></tbody>
+        </table>
+        <div class="source-links">
+          <span>Sources:</span>
+          <a href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee Constants (v2.rs)</a>
+          <a href="https://github.com/dashpay/platform/blob/master/packages/rs-dpp/src/data_contract/methods/registration_cost/v1/mod.rs" target="_blank" rel="noopener">Calculation Logic (rs-dpp)</a>
+          <a href="https://docs.dash.org/projects/platform/en/stable/docs/explanations/fees.html" target="_blank" rel="noopener">Fee Documentation</a>
+        </div>
+      </div>
     </section>
   `;
 
@@ -81,6 +101,7 @@ export function renderApp(container: HTMLElement): {
   const feeTbody = container.querySelector<HTMLTableSectionElement>('#fee-tbody')!;
   const feeTfoot = container.querySelector<HTMLTableSectionElement>('#fee-tfoot')!;
   const summarySection = container.querySelector<HTMLElement>('#summary-section')!;
+  const constantsTbody = container.querySelector<HTMLTableSectionElement>('#constants-tbody')!;
   const estimateBtn = container.querySelector<HTMLButtonElement>('#estimate-btn')!;
   const exampleSelect = container.querySelector<HTMLSelectElement>('#example-select')!;
   const feeBadge = container.querySelector<HTMLSpanElement>('#fee-badge')!;
@@ -150,6 +171,28 @@ export function renderApp(container: HTMLElement): {
           }</li>
         </ul>
       `;
+
+      const c = estimate.constants;
+      const constRows: [string, number][] = [
+        ['Base contract registration', c.baseContractRegistrationFee],
+        ['Document type registration', c.documentTypeRegistrationFee],
+        ['Non-unique index', c.documentTypeBaseNonUniqueIndexRegistrationFee],
+        ['Unique index', c.documentTypeBaseUniqueIndexRegistrationFee],
+        ['Contested index', c.documentTypeBaseContestedIndexRegistrationFee],
+        ['Token registration', c.tokenRegistrationFee],
+        ['Perpetual distribution', c.tokenUsesPerpetualDistributionFee],
+        ['Pre-programmed distribution', c.tokenUsesPreProgrammedDistributionFee],
+        ['Search keyword', c.searchKeywordFee],
+      ];
+      constantsTbody.innerHTML = constRows
+        .map(([label, credits]) => `
+          <tr>
+            <td>${esc(label)}</td>
+            <td class="num">${formatCredits(credits)}</td>
+            <td class="num">${creditsToDash(credits)}</td>
+          </tr>
+        `)
+        .join('');
     },
     showError: (msg: string) => {
       errorMsg.textContent = msg;
@@ -388,6 +431,75 @@ function addStyles() {
       color: var(--accent);
       font-weight: bold;
       margin-right: 0.5rem;
+    }
+
+    .sources-section {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .sources-section h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+      color: var(--text-primary);
+    }
+    .constants-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-bottom: 1rem;
+    }
+    .constants-table th {
+      text-align: left;
+      padding: 0.4rem 0.6rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .constants-table th.num,
+    .constants-table td.num {
+      text-align: right;
+    }
+    .constants-table td {
+      padding: 0.35rem 0.6rem;
+      border-bottom: 1px solid rgba(42, 53, 80, 0.3);
+      color: var(--text-secondary);
+    }
+    .source-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .source-links span {
+      margin-right: 0.25rem;
+    }
+    .source-links a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    .source-links a:hover {
+      text-decoration: underline;
+      color: var(--accent-hover);
+    }
+    .source-links a:not(:last-child)::after {
+      content: "\\00b7";
+      margin-left: 0.5rem;
+      color: var(--text-muted);
+    }
+    .fee-label {
+      color: var(--text-secondary);
+      text-decoration: none;
+    }
+    .fee-label:hover {
+      color: var(--accent);
+      text-decoration: underline;
     }
 
     @media (max-width: 600px) {
