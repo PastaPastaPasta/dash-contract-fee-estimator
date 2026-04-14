@@ -62,7 +62,10 @@ function runEstimate() {
 async function fetchLatestFeeConstants() {
   try {
     const resp = await fetch(FEE_CONSTANTS_SOURCE_URL);
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      ui.setFeeSource('bundled');
+      return;
+    }
     const source = await resp.text();
     activeFeeConstants = parseRustFeeConstants(source);
     ui.setFeeSource('live');

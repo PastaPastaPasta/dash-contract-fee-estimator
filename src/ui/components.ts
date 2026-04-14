@@ -2,6 +2,10 @@ import type { FeeEstimate, ParsedContract } from '../lib/types';
 import { creditsToDash, formatCredits } from './formatter';
 import { EXAMPLES } from './examples';
 
+function esc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 export function renderApp(container: HTMLElement): {
   getJsonInput: () => string;
   setJsonInput: (val: string) => void;
@@ -92,8 +96,8 @@ export function renderApp(container: HTMLElement): {
         .map((item) => `
           <tr>
             <td>
-              <span class="item-label">${item.label}</span>
-              <span class="item-desc">${item.description}</span>
+              <span class="item-label">${esc(item.label)}</span>
+              <span class="item-desc">${esc(item.description)}</span>
             </td>
             <td class="num">${item.count}</td>
             <td class="num">${creditsToDash(item.unitCostCredits)}</td>
@@ -136,13 +140,13 @@ export function renderApp(container: HTMLElement): {
         <ul>
           <li>${parsed.documentTypes.length} document type${parsed.documentTypes.length !== 1 ? 's' : ''}${
             parsed.documentTypes.length > 0
-              ? ` (${parsed.documentTypes.map((d) => d.name).join(', ')})`
+              ? ` (${parsed.documentTypes.map((d) => esc(d.name)).join(', ')})`
               : ''
           }</li>
           <li>${totalIndexes} index${totalIndexes !== 1 ? 'es' : ''}${indexParts ? ` (${indexParts})` : ''}</li>
           <li>${parsed.tokens.length} token${parsed.tokens.length !== 1 ? 's' : ''}</li>
           <li>${parsed.keywords.length} keyword${parsed.keywords.length !== 1 ? 's' : ''}${
-            parsed.keywords.length > 0 ? ` (${parsed.keywords.join(', ')})` : ''
+            parsed.keywords.length > 0 ? ` (${parsed.keywords.map((k) => esc(k)).join(', ')})` : ''
           }</li>
         </ul>
       `;
