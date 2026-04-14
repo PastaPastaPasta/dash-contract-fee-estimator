@@ -49,7 +49,7 @@ async function main() {
 
   while ((match = fieldPattern.exec(source)) !== null) {
     const [, fieldName, rawValue] = match;
-    if (FIELD_MAP[fieldName]) {
+    if (fieldName in FIELD_MAP) {
       parsed[fieldName] = Number(rawValue.replace(/_/g, ''));
     }
   }

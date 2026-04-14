@@ -23,8 +23,8 @@ export function renderApp(container: HTMLElement): {
       <h1>Dash Contract Fee Estimator</h1>
       <div class="fee-source">
         <span class="badge badge-bundled" id="fee-badge" title="Using fee constants bundled at build time. Fetching latest from GitHub...">bundled</span>
-        <select id="version-select" class="version-select" title="Select fee constant version">
-          <option value="">v2 (bundled)</option>
+        <select id="version-select" class="version-select" title="Select fee constant version" disabled>
+          <option value="">loading...</option>
         </select>
         <a class="fee-label" id="fee-source-link" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">view source</a>
       </div>
@@ -216,6 +216,10 @@ export function renderApp(container: HTMLElement): {
       feeBadge.title = source === 'live'
         ? `Fee constants fetched live from ${versionFile || 'DPP source'} on GitHub`
         : 'Using fee constants bundled at build time (GitHub fetch failed or pending)';
+      if (source === 'bundled' && versionSelect.querySelector('option[value=""]')) {
+        versionSelect.innerHTML = '<option value="">bundled</option>';
+        versionSelect.disabled = true;
+      }
       if (sourceUrl) {
         feeSourceLink.href = sourceUrl;
       }
@@ -229,9 +233,10 @@ export function renderApp(container: HTMLElement): {
         .map((v) => {
           const label = v.replace('.rs', '');
           const isSelected = v === selected ? ' selected' : '';
-          return `<option value="${v}"${isSelected}>${label}</option>`;
+          return `<option value="${esc(v)}"${isSelected}>${esc(label)}</option>`;
         })
         .join('');
+      versionSelect.disabled = false;
     },
     onEstimate: (handler: () => void) => {
       estimateBtn.addEventListener('click', handler);
@@ -247,7 +252,8 @@ export function renderApp(container: HTMLElement): {
     },
     onVersionSelect: (handler: (versionFile: string) => void) => {
       versionSelect.addEventListener('change', () => {
-        handler(versionSelect.value);
+        const val = versionSelect.value;
+        if (val) handler(val);
       });
     },
   };
