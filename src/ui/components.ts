@@ -12,16 +12,21 @@ export function renderApp(container: HTMLElement): {
   showResult: (estimate: FeeEstimate, parsed: ParsedContract) => void;
   showError: (msg: string) => void;
   clearResult: () => void;
-  setFeeSource: (source: 'live' | 'bundled') => void;
+  setFeeSource: (source: 'live' | 'bundled', versionFile?: string, sourceUrl?: string) => void;
+  setVersionOptions: (versions: string[], selected: string) => void;
   onEstimate: (handler: () => void) => void;
   onExampleSelect: (handler: (index: number) => void) => void;
+  onVersionSelect: (handler: (versionFile: string) => void) => void;
 } {
   container.innerHTML = `
     <header class="header">
       <h1>Dash Contract Fee Estimator</h1>
       <div class="fee-source">
         <span class="badge badge-bundled" id="fee-badge" title="Using fee constants bundled at build time. Fetching latest from GitHub...">bundled</span>
-        <a class="fee-label" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee constants: v2 (protocol 9)</a>
+        <select id="version-select" class="version-select" title="Select fee constant version">
+          <option value="">v2 (bundled)</option>
+        </select>
+        <a class="fee-label" id="fee-source-link" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">view source</a>
       </div>
     </header>
 
@@ -85,7 +90,7 @@ export function renderApp(container: HTMLElement): {
         </table>
         <div class="source-links">
           <span>Sources:</span>
-          <a href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee Constants (v2.rs)</a>
+          <a id="fee-constants-link" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee Constants (v2.rs)</a>
           <a href="https://github.com/dashpay/platform/blob/master/packages/rs-dpp/src/data_contract/methods/registration_cost/v1/mod.rs" target="_blank" rel="noopener">Calculation Logic (rs-dpp)</a>
           <a href="https://docs.dash.org/projects/platform/en/stable/docs/explanations/fees.html" target="_blank" rel="noopener">Fee Documentation</a>
         </div>
@@ -105,6 +110,9 @@ export function renderApp(container: HTMLElement): {
   const estimateBtn = container.querySelector<HTMLButtonElement>('#estimate-btn')!;
   const exampleSelect = container.querySelector<HTMLSelectElement>('#example-select')!;
   const feeBadge = container.querySelector<HTMLSpanElement>('#fee-badge')!;
+  const versionSelect = container.querySelector<HTMLSelectElement>('#version-select')!;
+  const feeSourceLink = container.querySelector<HTMLAnchorElement>('#fee-source-link')!;
+  const feeConstantsLink = container.querySelector<HTMLAnchorElement>('#fee-constants-link');
 
   return {
     getJsonInput: () => jsonInput.value,
@@ -202,12 +210,28 @@ export function renderApp(container: HTMLElement): {
       resultSection.classList.add('hidden');
       errorMsg.textContent = '';
     },
-    setFeeSource: (source: 'live' | 'bundled') => {
+    setFeeSource: (source: 'live' | 'bundled', versionFile?: string, sourceUrl?: string) => {
       feeBadge.textContent = source;
       feeBadge.className = `badge badge-${source}`;
       feeBadge.title = source === 'live'
-        ? 'Fee constants fetched live from the DPP source on GitHub'
+        ? `Fee constants fetched live from ${versionFile || 'DPP source'} on GitHub`
         : 'Using fee constants bundled at build time (GitHub fetch failed or pending)';
+      if (sourceUrl) {
+        feeSourceLink.href = sourceUrl;
+      }
+      if (versionFile && feeConstantsLink) {
+        feeConstantsLink.textContent = `Fee Constants (${versionFile})`;
+        if (sourceUrl) feeConstantsLink.href = sourceUrl;
+      }
+    },
+    setVersionOptions: (versions: string[], selected: string) => {
+      versionSelect.innerHTML = versions
+        .map((v) => {
+          const label = v.replace('.rs', '');
+          const isSelected = v === selected ? ' selected' : '';
+          return `<option value="${v}"${isSelected}>${label}</option>`;
+        })
+        .join('');
     },
     onEstimate: (handler: () => void) => {
       estimateBtn.addEventListener('click', handler);
@@ -219,6 +243,11 @@ export function renderApp(container: HTMLElement): {
           handler(Number(val));
           exampleSelect.value = '';
         }
+      });
+    },
+    onVersionSelect: (handler: (versionFile: string) => void) => {
+      versionSelect.addEventListener('change', () => {
+        handler(versionSelect.value);
       });
     },
   };
@@ -496,9 +525,23 @@ function addStyles() {
       margin-left: 0.5rem;
       color: var(--text-muted);
     }
+    .version-select {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: var(--font-mono);
+    }
+    .version-select:hover {
+      border-color: var(--accent);
+    }
     .fee-label {
       color: var(--text-secondary);
       text-decoration: none;
+      font-size: 0.8rem;
     }
     .fee-label:hover {
       color: var(--accent);

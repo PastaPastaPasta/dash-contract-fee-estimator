@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseRustFeeConstants } from '../src/lib/rust-parser';
+import { parseRustFeeConstants, findVersionFiles, findLatestVersionFile } from '../src/lib/rust-parser';
 
 const v2Source = readFileSync(
   resolve(__dirname, 'fixtures/fee-constants-v2.rs'),
@@ -84,5 +84,39 @@ describe('parseRustFeeConstants', () => {
     const constants = parseRustFeeConstants(source);
     expect(constants.baseContractRegistrationFee).toBe(100);
     expect(constants.searchKeywordFee).toBe(900);
+  });
+});
+
+describe('findVersionFiles', () => {
+  it('finds all versions sorted ascending', () => {
+    const modSource = `
+      pub mod v1;
+      pub mod v2;
+    `;
+    expect(findVersionFiles(modSource)).toEqual(['v1.rs', 'v2.rs']);
+  });
+
+  it('handles unordered modules', () => {
+    const modSource = `
+      pub mod v3;
+      pub mod v1;
+      pub mod v2;
+    `;
+    expect(findVersionFiles(modSource)).toEqual(['v1.rs', 'v2.rs', 'v3.rs']);
+  });
+
+  it('throws on empty mod.rs', () => {
+    expect(() => findVersionFiles('// nothing here')).toThrow('No version modules');
+  });
+});
+
+describe('findLatestVersionFile', () => {
+  it('returns the highest version', () => {
+    const modSource = 'pub mod v1;\npub mod v2;\npub mod v3;';
+    expect(findLatestVersionFile(modSource)).toBe('v3.rs');
+  });
+
+  it('works with single version', () => {
+    expect(findLatestVersionFile('pub mod v1;')).toBe('v1.rs');
   });
 });

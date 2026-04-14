@@ -13,6 +13,10 @@ export const DEFAULT_FEE_CONSTANTS: FeeConstants = {
   searchKeywordFee: 10_000_000_000, // 0.1 Dash
 };
 
-/** Source URL for fetching latest fee constants from DPP */
-export const FEE_CONSTANTS_SOURCE_URL =
-  'https://raw.githubusercontent.com/dashpay/platform/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs';
+/** Base directory URL for fee constant source files in DPP */
+export const FEE_CONSTANTS_BASE_URL =
+  'https://raw.githubusercontent.com/dashpay/platform/master/packages/rs-platform-version/src/version/fee/data_contract_registration';
+
+/** GitHub blob URL for linking to source (not raw) */
+export const FEE_CONSTANTS_BLOB_BASE_URL =
+  'https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration';

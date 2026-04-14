@@ -43,3 +43,29 @@ export function parseRustFeeConstants(rustSource: string): FeeConstants {
 
   return result;
 }
+
+/**
+ * Parse a Rust mod.rs to find all version modules (e.g. ["v1.rs", "v2.rs"]).
+ * Returns sorted ascending by version number.
+ */
+export function findVersionFiles(modSource: string): string[] {
+  const modPattern = /pub\s+mod\s+(v(\d+))\s*;/g;
+  const versions: { file: string; num: number }[] = [];
+  let match;
+  while ((match = modPattern.exec(modSource)) !== null) {
+    versions.push({ file: `${match[1]}.rs`, num: Number(match[2]) });
+  }
+  if (versions.length === 0) {
+    throw new Error('No version modules found in mod.rs');
+  }
+  return versions.sort((a, b) => a.num - b.num).map((v) => v.file);
+}
+
+/**
+ * Parse a Rust mod.rs to find the highest version module.
+ * Returns the version filename like "v2.rs".
+ */
+export function findLatestVersionFile(modSource: string): string {
+  const files = findVersionFiles(modSource);
+  return files[files.length - 1];
+}
