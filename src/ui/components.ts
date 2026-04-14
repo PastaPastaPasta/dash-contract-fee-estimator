@@ -20,7 +20,7 @@ export function renderApp(container: HTMLElement): {
     <header class="header">
       <h1>Dash Contract Fee Estimator</h1>
       <div class="fee-source">
-        <span class="badge" id="fee-badge">bundled</span>
+        <span class="badge badge-bundled" id="fee-badge" title="Using fee constants bundled at build time. Fetching latest from GitHub...">bundled</span>
         <a class="fee-label" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee constants: v2 (protocol 9)</a>
       </div>
     </header>
@@ -205,6 +205,9 @@ export function renderApp(container: HTMLElement): {
     setFeeSource: (source: 'live' | 'bundled') => {
       feeBadge.textContent = source;
       feeBadge.className = `badge badge-${source}`;
+      feeBadge.title = source === 'live'
+        ? 'Fee constants fetched live from the DPP source on GitHub'
+        : 'Using fee constants bundled at build time (GitHub fetch failed or pending)';
     },
     onEstimate: (handler: () => void) => {
       estimateBtn.addEventListener('click', handler);
