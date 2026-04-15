@@ -21,6 +21,7 @@
     "build": "tsc --noEmit && vite build",
     "build:lib": "BUILD_LIB=true vite build && tsc -p tsconfig.lib.json",
     "build:all": "npm run build && npm run build:lib",
+    "prepare": "npm run build:lib",
     "preview": "vite preview",
     "test": "vitest"
   },
