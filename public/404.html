@@ -1,21 +1,29 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en">
+<head>
 <meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'">
-<title>Fee estimator has moved · dashhq</title>
 <script src="/dashhq/dashhq-shell.js"></script>
+<link rel="preload" href="/dashhq/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/dashhq/dashhq-tokens.css">
 <link rel="stylesheet" href="/dashhq/dashhq-shell.css">
-<link rel="stylesheet" href="/not-found.css">
 <link rel="stylesheet" href="/dashhq/dashhq-components.css">
 <link rel="icon" href="/dashhq/mark/favicon.svg" type="image/svg+xml">
-</head><body>
-<a href="#main">Skip to content</a>
-<dashhq-bar product="fees" network="mainnet" sticky></dashhq-bar>
-<main id="main"><h1>Fee estimator has moved into Explorer</h1>
-<p>Same calculator, now beside your contracts and identities. Opening Explorer’s fee tool in a moment.</p>
-<p><a id="fee-destination" href="https://explorer.dashhq.org/tools/fees/">Continue to Explorer →</a> · <a href="https://dashhq.org" data-family="home">Find another tool →</a></p></main>
-<dashhq-footer product="fees"></dashhq-footer>
-<script src="/not-found.js"></script>
-</body></html>
+<link rel="stylesheet" href="/retired.css">
+<title>Fee estimator moved to Explorer · dashhq</title>
+<meta name="description" content="Same calculator, now beside your contracts and identities. Your network and contract stay with you.">
+</head>
+<body class="dh-fill">
+<a class="skip" href="#main">Skip to content</a>
+<dashhq-bar product="fees" network="mainnet" networks="mainnet testnet" sticky></dashhq-bar>
+<main id="main" class="dh-container dh-page"><div class="dh-narrow">
+<dashhq-moved product="fees" to="explorer" path="/tools/fees/" heading="Fee estimator moved to Explorer" lede="Same calculator, now beside your contracts and identities. Your network and contract stay with you." label="Continue to Explorer">
+<h1>Fee estimator moved to Explorer</h1><p>Same calculator, now beside your contracts and identities. Your network and contract stay with you.</p><p><a href="https://explorer.dashhq.org/tools/fees/?network=mainnet">Continue to Explorer →</a></p>
+</dashhq-moved>
+
+<noscript><p>JavaScript is off. Use the link above, then select your network in Explorer.</p></noscript>
+</div></main>
+<dashhq-footer product="fees" source="https://github.com/PastaPastaPasta/dash-contract-fee-estimator"></dashhq-footer>
+</body>
+</html>
