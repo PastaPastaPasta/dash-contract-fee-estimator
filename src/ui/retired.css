@@ -1,0 +1,5 @@
+body { margin: 0; background: var(--dh-page); color: var(--dh-ink); font: 16px/1.6 var(--dh-font); }
+.skip-link { position: fixed; top: -80px; left: 16px; z-index: 100; padding: 10px; background: var(--dh-surface); }
+.skip-link:focus { top: 8px; }
+#app { min-height: 55vh; }
+#fee-destination { width: fit-content; }
