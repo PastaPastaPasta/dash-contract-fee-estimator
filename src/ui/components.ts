@@ -34,40 +34,40 @@ export function renderApp(container: HTMLElement): {
   const bundledSource = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.revision}/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs`;
   const sourceDescription = `Fee table: v2 · protocols 9–13 · bundled source ${BUNDLED_FEE_TABLE.sourceDate} (${BUNDLED_FEE_TABLE.revision.slice(0, 7)}).`;
   container.innerHTML = `
-    <div class="page-intro">
-      <p class="tool-links"><a href="${window.dashhq.href('explorer', '/', { network: network as 'mainnet' | 'testnet' })}">Explorer</a><span>·</span><a href="${window.dashhq.href('dapi', '/', { network: network as 'mainnet' | 'testnet' })}">DAPI console →</a></p>
-      <h1>Estimate contract fees</h1>
-      <p>See what a data contract costs to register on Platform. JSON is processed here; Continue to Bridge carries it to the registration flow.</p>
-      ${identity ? `<p class="field-hint">Continue from <a href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, { network: network as 'mainnet' | 'testnet' }))}">your identity in Explorer →</a>. Estimate registration, plan a reserve, then review in Bridge.</p>` : ''}
-    </div>
-    <div class="fee-source">
+    <header class="dh-page-header">
+
+      <h1 class="dh-page-header__title">Estimate contract fees</h1>
+      <p class="dh-page-header__lede">See what a data contract costs to register on Platform. JSON is processed here; Continue to Bridge carries it to the registration flow.</p>
+      ${identity ? `<p class="dh-field__help">Continue from <a href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, { network: network as 'mainnet' | 'testnet' }))}">your identity in Explorer →</a>. Estimate registration, plan a reserve, then review in Bridge.</p>` : ''}
+    </header>
+    <div id="fee-source-notice" class="fee-source dh-notice dh-notice--info">
       <p id="fee-source-description">${sourceDescription}</p>
       <p id="protocol-status" role="status">Reading current protocol…</p>
       <div class="fee-source-actions">
         <button class="dh-btn" id="refresh-fees" type="button">Refresh protocol and fee source</button>
-        <label for="version-select" class="visually-hidden">Fee table version</label>
-        <select id="version-select" disabled><option value="v2.rs">v2 · protocols 9–13</option></select>
+        <label class="dh-field__label visually-hidden" for="version-select">Fee table version</label>
+        <select class="dh-select" id="version-select" disabled><option value="v2.rs">v2 · protocols 9–13</option></select>
         <a id="fee-source-link" href="${bundledSource}" target="_blank" rel="noopener">View source ↗</a>
       </div>
       <p id="refresh-message" role="status"></p>
     </div>
 
-    <section class="input-section">
-      <form id="load-contract-form" class="contract-loader">
-        <label for="contract-id">Existing contract ID (base58)</label>
-        <div><input id="contract-id" autocomplete="off" spellcheck="false" required placeholder="Paste a contract ID from Explorer"><button class="dh-btn" id="load-contract" type="submit">Load contract</button></div>
-        <p id="contract-status" role="status" class="field-hint">Optional: load a public schema from ${esc(networkLabel)}, or paste JSON below.</p>
+    <section class="input-section dh-card">
+      <form id="load-contract-form" class="contract-loader dh-field">
+        <label class="dh-field__label" for="contract-id">Existing contract ID (base58)</label>
+        <div class="dh-inline-form"><input class="dh-input dh-input--mono" aria-describedby="contract-status" id="contract-id" autocomplete="off" spellcheck="false" required placeholder="Paste a contract ID from Explorer"><button class="dh-btn" id="load-contract" type="submit">Load contract</button></div>
+        <p id="contract-status" role="status" class="dh-field__help">Optional: load a public schema from ${esc(networkLabel)}, or paste JSON below.</p>
       </form>
       <div class="input-header">
-        <label for="json-input">Data contract JSON</label>
+        <label class="dh-field__label" for="json-input">Data contract JSON</label>
         <div class="input-actions">
-          <select id="example-select" aria-label="Load an example">
+          <select class="dh-select" id="example-select" aria-label="Load an example">
             <option value="">Load an example…</option>
             ${EXAMPLES.map((e, i) => `<option value="${i}">${e.name}</option>`).join('')}
           </select>
         </div>
       </div>
-      <textarea id="json-input" rows="16" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{
+      <textarea class="dh-textarea dh-input--mono" id="json-input" rows="16" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{
   "documentSchemas": {
     "myDocument": {
       "type": "object",
@@ -80,20 +80,20 @@ export function renderApp(container: HTMLElement): {
     }
   }
 }'></textarea>
-      <p id="json-hint" class="field-hint">Paste a contract or choose an example. Estimates cover registration fees; processing and storage costs are additional.</p>
+      <p id="json-hint" class="dh-field__help">Paste a contract or choose an example. Estimates cover registration fees; processing and storage costs are additional.</p>
       <div class="input-footer">
         <button class="dh-btn dh-btn--primary" id="estimate-btn">Estimate fees</button>
-        <span id="error-msg" class="error-msg" role="alert"></span>
+        <span id="error-msg" class="dh-field__error" role="alert"></span>
       </div>
     </section>
 
-    <section id="result-section" class="result-section hidden" tabindex="-1" aria-labelledby="result-title">
-      <h2 id="result-title">Registration estimate</h2>
-      <div id="estimate-total" class="estimate-total" role="status"></div>
-      <p id="estimate-protocol" class="field-hint"></p>
-      <p id="estimate-source" class="field-hint">${sourceDescription}</p>
-      <p class="field-hint">Itemised registration fees in ${unit}.</p>
-      <table class="fee-table">
+    <section id="result-section" class="result-section dh-card hidden" tabindex="-1" aria-labelledby="result-title">
+      <h2 class="dh-section__title" id="result-title">Registration estimate</h2>
+      <div id="estimate-total" class="dh-stat dh-stat--key" role="status"></div>
+      <p id="estimate-protocol" class="dh-notice dh-notice--info"></p>
+      <p id="estimate-source" class="dh-field__help">${sourceDescription}</p>
+      <p class="dh-field__help">Itemised registration fees in ${unit}.</p>
+      <table class="dh-table dh-table--stack">
         <thead>
           <tr>
             <th>Item</th>
@@ -108,18 +108,19 @@ export function renderApp(container: HTMLElement): {
 
       <div id="summary-section" class="summary-section"></div>
       <div class="budget-section">
-        <h3>Plan the funding</h3>
+        <h3 class="dh-h3">Plan the funding</h3>
         <p>The registration estimate is the minimum component. Processing depends on the final transition and signatures; storage depends on bytes and retention. Later document writes, tokens and name contests cost extra. An existing contract’s original registration is already paid.</p>
-        <label for="planned-reserve">Your additional reserve (${unit})</label>
-        <input id="planned-reserve" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Choose a reserve">
-        <p id="funding-plan" class="field-hint" role="status">Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.</p>
-        <p class="field-hint">Next: import this schema into Bridge, choose your identity, then request its current transition estimate before funding or signing. Budget for that quote plus the writes your app will make; there is no universal reserve. ${network === 'mainnet' ? 'Mainnet · real DASH.' : 'Testnet · practice funds have no monetary value.'}</p>
-        <a id="register-contract" class="dh-btn continue-link">Continue to Bridge on ${esc(networkLabel)} →</a>
+        <label class="dh-field__label" for="planned-reserve">Your additional reserve (${unit})</label>
+        <input class="dh-input" aria-describedby="funding-plan" id="planned-reserve" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Choose a reserve">
+        <p id="funding-plan" class="dh-field__help" role="status">Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.</p>
+        <p class="dh-field__help">Next: import this schema into Bridge, choose your identity, then request its current transition estimate before funding or signing. Budget for that quote plus the writes your app will make; there is no universal reserve. ${network === 'mainnet' ? 'Mainnet · real DASH.' : 'Testnet · practice funds have no monetary value.'}</p>
+        <a id="register-contract" class="dh-btn dh-btn--primary" aria-disabled="true">Continue to Bridge on ${esc(networkLabel)} →</a>
       </div>
 
+      <p class="dh-elsewhere"><a href="${window.dashhq.href('explorer', '/', { network: network as 'mainnet' | 'testnet' })}">Explorer</a><span>·</span><a href="${window.dashhq.href('dapi', '/', { network: network as 'mainnet' | 'testnet' })}">DAPI console →</a></p>
       <div class="sources-section">
-        <h3>Fee reference</h3>
-        <table class="constants-table">
+        <h3 class="dh-h3">Fee reference</h3>
+        <table class="dh-table dh-table--cards">
           <thead>
             <tr>
               <th>Fee type</th>
@@ -168,7 +169,15 @@ export function renderApp(container: HTMLElement): {
   });
 
   return {
-    setProtocolStatus: (message: string) => { container.querySelector('#protocol-status')!.textContent = message; container.querySelector('#estimate-protocol')!.textContent = message; },
+    setProtocolStatus: (message: string) => {
+      container.querySelector('#protocol-status')!.textContent = message;
+      container.querySelector('#estimate-protocol')!.textContent = message;
+      const unconfirmed = /unconfirmed|not confirmed|hypothetical|provisional|unavailable|couldn.t|unknown|reading/i.test(message);
+      for (const notice of container.querySelectorAll('#estimate-protocol, #fee-source-notice')) {
+        notice.classList.toggle('dh-notice--warn', unconfirmed);
+        notice.classList.toggle('dh-notice--info', !unconfirmed);
+      }
+    },
     getJsonInput: () => jsonInput.value,
     setJsonInput: (val: string) => { jsonInput.value = val; },
     showResult: (estimate: FeeEstimate, parsed: ParsedContract) => {
@@ -179,19 +188,23 @@ export function renderApp(container: HTMLElement): {
       reserve.dispatchEvent(new Event('input'));
       const bridgeLink = container.querySelector<HTMLAnchorElement>('#register-contract')!;
       const encoded = encodeContractHandoff(jsonInput.value);
+      estimateBtn.classList.remove('dh-btn--primary');
       if (encoded.length <= 24000 && (network === 'mainnet' || network === 'testnet')) {
+        bridgeLink.removeAttribute('aria-disabled');
         bridgeLink.href = window.dashhq.href('bridge', '/?mode=contract&from=fees&feeSchedule=' + encodeURIComponent(versionSelect.dataset.activeVersion ?? '') + '&registrationCredits=' + estimate.totalCredits + '&contract=' + encoded + (identity ? '&identity=' + encodeURIComponent(identity) : ''), { network });
         bridgeLink.textContent = `Continue to Bridge on ${networkLabel} →`;
       } else {
         bridgeLink.removeAttribute('href');
+        bridgeLink.setAttribute('aria-disabled', 'true');
+        estimateBtn.classList.add('dh-btn--primary');
         bridgeLink.textContent = 'Open Bridge from the family menu and paste this schema. It is too large for a link, or this network needs its own Bridge.';
       }
-      container.querySelector('#estimate-total')!.innerHTML = `<strong>${creditsToDash(estimate.totalCredits)} <span>${unit}</span></strong><p>${formatCredits(estimate.totalCredits)} credits · registration only</p>`;
+      container.querySelector('#estimate-total')!.innerHTML = `<strong class="dh-stat__value">${creditsToDash(estimate.totalCredits)} <span class="dh-unit">${unit}</span></strong><p class="dh-stat__note">${formatCredits(estimate.totalCredits)} credits · registration only</p>`;
 
       feeTbody.innerHTML = estimate.lineItems
         .map((item) => `
           <tr>
-            <td>
+            <td data-label="Item">
               <span class="item-label">${esc(item.label)}</span>
               <span class="item-desc">${esc(item.description)}</span>
             </td>
@@ -204,10 +217,10 @@ export function renderApp(container: HTMLElement): {
 
       feeTfoot.innerHTML = `
         <tr class="total-row">
-          <td><strong>Total</strong></td>
-          <td class="num"></td>
-          <td class="num"></td>
-          <td class="num">
+          <td data-label="Item"><strong>Total</strong></td>
+          <td class="num" data-label="Count"></td>
+          <td class="num" data-label="Unit"></td>
+          <td class="num" data-label="Total">
             <strong>${creditsToDash(estimate.totalCredits)} ${unit}</strong>
             <span class="credits-display">${formatCredits(estimate.totalCredits)} credits</span>
           </td>
@@ -232,7 +245,7 @@ export function renderApp(container: HTMLElement): {
       ].filter(Boolean).join(', ');
 
       summarySection.innerHTML = `
-        <h3>Contract summary</h3>
+        <h3 class="dh-h3">Contract summary</h3>
         <ul>
           <li>${parsed.documentTypes.length} document type${parsed.documentTypes.length !== 1 ? 's' : ''}${
             parsed.documentTypes.length > 0
@@ -263,7 +276,7 @@ export function renderApp(container: HTMLElement): {
       constantsTbody.innerHTML = constRows
         .map(([label, credits]) => `
           <tr>
-            <td>${esc(label)}</td>
+            <td data-label="Fee type" class="dh-rc-title">${esc(label)}</td>
             <td class="num" data-label="Credits">${formatCredits(credits)}</td>
             <td class="num" data-label="${unit}">${creditsToDash(credits)}</td>
           </tr>
@@ -274,9 +287,11 @@ export function renderApp(container: HTMLElement): {
       errorMsg.textContent = msg;
       jsonInput.setAttribute('aria-invalid', 'true');
       resultSection.classList.add('hidden');
+      estimateBtn.classList.add('dh-btn--primary');
     },
     clearResult: () => {
       resultSection.classList.add('hidden');
+      estimateBtn.classList.add('dh-btn--primary');
       errorMsg.textContent = '';
       jsonInput.removeAttribute('aria-invalid');
     },
@@ -310,6 +325,7 @@ export function renderApp(container: HTMLElement): {
     onRefresh: (handler: () => void) => { refreshBtn.addEventListener('click', handler); },
     setRefreshState: (loading: boolean, message = '') => {
       refreshBtn.disabled = loading;
+      refreshBtn.setAttribute('aria-busy', String(loading));
       if (!loading) versionSelect.value = versionSelect.dataset.activeVersion ?? '';
       versionSelect.disabled = loading || !versionSelect.querySelector('option[value$=".rs"]');
       refreshBtn.textContent = loading ? 'Reading GitHub…' : 'Refresh protocol and fee source';
