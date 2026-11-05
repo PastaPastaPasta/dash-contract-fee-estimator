@@ -1,3 +1,5 @@
+import './ui/styles.css';
+import type {} from '../public/dashhq/dashhq-shell';
 import { estimateContractFee } from './lib/estimator';
 import { parseContractJson } from './lib/parser';
 import { parseRustFeeConstants, findVersionFiles } from './lib/rust-parser';
@@ -7,23 +9,30 @@ import { renderApp } from './ui/components';
 import { EXAMPLES } from './ui/examples';
 
 let activeFeeConstants: FeeConstants = DEFAULT_FEE_CONSTANTS;
-let cachedVersionConstants: Record<string, FeeConstants> = {};
+const cachedVersionConstants: Record<string, FeeConstants> = {};
 
 const app = document.getElementById('app')!;
 const ui = renderApp(app);
 
-// Try to fetch latest fee constants from GitHub
-fetchAndSetupVersions();
+ui.onRefresh(async () => {
+  ui.setRefreshState(true);
+  const loaded = await fetchAndSetupVersions();
+  ui.setRefreshState(false, loaded ? 'Fee table updated from GitHub.' : 'Couldn’t update the fee table. The current table is still in use. Try again shortly.');
+  if (ui.getJsonInput().trim()) runEstimate();
+});
 
 // Wire up event handlers
-ui.onEstimate(runEstimate);
+ui.onEstimate(() => { runEstimate(); ui.revealResult(); });
 ui.onExampleSelect((index) => {
   ui.setJsonInput(JSON.stringify(EXAMPLES[index].json, null, 2));
   runEstimate();
+  ui.revealResult();
 });
 ui.onVersionSelect(async (versionFile) => {
-  await loadVersion(versionFile);
-  runEstimate();
+  ui.setRefreshState(true);
+  const loaded = await loadVersion(versionFile);
+  ui.setRefreshState(false, loaded ? '' : 'Couldn’t load that version. The previous fee table is still in use.');
+  if (ui.getJsonInput().trim()) runEstimate();
 });
 
 // Auto-estimate on input (debounced)
@@ -64,45 +73,32 @@ function runEstimate() {
   }
 }
 
-async function fetchAndSetupVersions() {
+async function fetchAndSetupVersions(): Promise<boolean> {
   try {
     const modResp = await fetch(`${FEE_CONSTANTS_BASE_URL}/mod.rs`);
-    if (!modResp.ok) {
-      ui.setFeeSource('bundled');
-      return;
-    }
-    const modSource = await modResp.text();
-    const versions = findVersionFiles(modSource);
+    if (!modResp.ok) return false;
+    const versions = findVersionFiles(await modResp.text());
     const latest = versions[versions.length - 1];
-
+    if (!latest || !await loadVersion(latest)) return false;
     ui.setVersionOptions(versions, latest);
-    await loadVersion(latest);
+    return true;
   } catch {
-    ui.setFeeSource('bundled');
+    return false;
   }
 }
 
-async function loadVersion(versionFile: string) {
+async function loadVersion(versionFile: string): Promise<boolean> {
   const blobUrl = `${FEE_CONSTANTS_BLOB_BASE_URL}/${versionFile}`;
-
-  if (cachedVersionConstants[versionFile]) {
+  try {
+    if (!cachedVersionConstants[versionFile]) {
+      const resp = await fetch(`${FEE_CONSTANTS_BASE_URL}/${versionFile}`);
+      if (!resp.ok) return false;
+      cachedVersionConstants[versionFile] = parseRustFeeConstants(await resp.text());
+    }
     activeFeeConstants = cachedVersionConstants[versionFile];
     ui.setFeeSource('live', versionFile, blobUrl);
-    return;
-  }
-
-  try {
-    const resp = await fetch(`${FEE_CONSTANTS_BASE_URL}/${versionFile}`);
-    if (!resp.ok) {
-      ui.setFeeSource('bundled');
-      return;
-    }
-    const source = await resp.text();
-    const constants = parseRustFeeConstants(source);
-    cachedVersionConstants[versionFile] = constants;
-    activeFeeConstants = constants;
-    ui.setFeeSource('live', versionFile, blobUrl);
+    return true;
   } catch {
-    ui.setFeeSource('bundled');
+    return false;
   }
 }
