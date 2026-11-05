@@ -204,7 +204,7 @@ export function renderApp(container: HTMLElement): {
       feeTbody.innerHTML = estimate.lineItems
         .map((item) => `
           <tr>
-            <td data-label="Item">
+            <td data-label="Item" class="dh-rc-title">
               <span class="item-label">${esc(item.label)}</span>
               <span class="item-desc">${esc(item.description)}</span>
             </td>
@@ -217,12 +217,12 @@ export function renderApp(container: HTMLElement): {
 
       feeTfoot.innerHTML = `
         <tr class="total-row">
-          <td data-label="Item"><strong>Total</strong></td>
-          <td class="num" data-label="Count"></td>
-          <td class="num" data-label="Unit"></td>
+          <td data-label="Item" class="dh-rc-hide"><strong>Total</strong></td>
+          <td class="num dh-rc-hide" data-label="Count"></td>
+          <td class="num dh-rc-hide" data-label="Unit"></td>
           <td class="num" data-label="Total">
-            <strong>${creditsToDash(estimate.totalCredits)} ${unit}</strong>
-            <span class="credits-display">${formatCredits(estimate.totalCredits)} credits</span>
+            <div><strong>${creditsToDash(estimate.totalCredits)} ${unit}</strong>
+            <span class="credits-display">${formatCredits(estimate.totalCredits)} credits</span></div>
           </td>
         </tr>
       `;
