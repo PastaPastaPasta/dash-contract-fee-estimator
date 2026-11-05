@@ -71,3 +71,14 @@ th, td { padding: 9px; border-bottom: 1px solid var(--dh-line); }
   tfoot td:empty { display: none; }
   .total-row td { padding: 16px 0 0; }
 }
+
+.contract-loader { margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid var(--dh-line); }
+.contract-loader > div { display: flex; gap: 8px; margin-top: 8px; }
+input { min-width: 0; min-height: var(--dh-ctl-h); color: var(--dh-ink); background: var(--dh-page); border: 1px solid var(--dh-line-2); border-radius: var(--dh-r2); padding: 8px; font: 14px var(--dh-mono); }
+#contract-id { flex: 1; }
+.contract-loader label, .budget-section label { display: block; font-size: 13px; margin-top: 12px; }
+.budget-section { margin-top: 24px; border-top: 1px solid var(--dh-line); padding-top: 20px; }
+.budget-section > p { color: var(--dh-ink-2); }
+.continue-link { display: inline-block; min-height: 42px; padding: 10px 0; }
+.continue-link:not([href]) { color: var(--dh-ink-2); }
+@media (max-width:600px) { .contract-loader > div { flex-direction: column; } input { min-height: 42px; font-size: 16px; } }

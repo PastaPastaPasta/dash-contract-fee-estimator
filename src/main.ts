@@ -2,17 +2,44 @@ import './ui/styles.css';
 import type {} from '../public/dashhq/dashhq-shell';
 import { estimateContractFee } from './lib/estimator';
 import { parseContractJson } from './lib/parser';
-import { parseRustFeeConstants, findVersionFiles } from './lib/rust-parser';
+import { findVersionFiles } from './lib/rust-parser';
+import { fetchFeeVersion } from './lib/fee-source';
+import { fetchContract } from './lib/contract-source';
 import { DEFAULT_FEE_CONSTANTS, FEE_CONSTANTS_BASE_URL, FEE_CONSTANTS_BLOB_BASE_URL } from './lib/constants';
 import type { FeeConstants } from './lib/types';
 import { renderApp } from './ui/components';
 import { EXAMPLES } from './ui/examples';
 
 let activeFeeConstants: FeeConstants = DEFAULT_FEE_CONSTANTS;
-const cachedVersionConstants: Record<string, FeeConstants> = {};
 
 const app = document.getElementById('app')!;
 const ui = renderApp(app);
+const params = new URLSearchParams(window.location.search);
+document.querySelector('dashhq-bar')!.setAttribute('network', params.get('network') ?? 'mainnet');
+const contractInput = app.querySelector<HTMLInputElement>('#contract-id')!;
+const contractStatus = app.querySelector<HTMLElement>('#contract-status')!;
+const loadContractButton = app.querySelector<HTMLButtonElement>('#load-contract')!;
+contractInput.value = params.get('contract') ?? '';
+app.querySelector('#load-contract-form')!.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const id = contractInput.value.trim();
+  const previousJson = ui.getJsonInput();
+  loadContractButton.disabled = true;
+  contractStatus.textContent = 'Reading contract from Platform…';
+  try {
+    const contract = await fetchContract(id, params.get('network') ?? 'mainnet');
+    const url = new URL(window.location.href);
+    url.searchParams.set('contract', id);
+    window.history.replaceState(null, '', url);
+    if (ui.getJsonInput() !== previousJson) throw new Error('Your JSON changed while the contract was loading. Your edits were kept. Load again to replace them.');
+    ui.setJsonInput(JSON.stringify(contract, null, 2));
+    contractStatus.textContent = 'Contract loaded. Edit the JSON to estimate a new deployment.';
+    runEstimate();
+  } catch (error) {
+    contractStatus.textContent = error instanceof Error ? error.message : 'Couldn’t read the contract. Try again.';
+  } finally { loadContractButton.disabled = false; }
+});
+if (contractInput.value) app.querySelector<HTMLFormElement>('#load-contract-form')!.requestSubmit();
 
 ui.onRefresh(async () => {
   ui.setRefreshState(true);
@@ -75,7 +102,7 @@ function runEstimate() {
 
 async function fetchAndSetupVersions(): Promise<boolean> {
   try {
-    const modResp = await fetch(`${FEE_CONSTANTS_BASE_URL}/mod.rs`);
+    const modResp = await fetch(`${FEE_CONSTANTS_BASE_URL}/mod.rs`, { signal: AbortSignal.timeout(12000) });
     if (!modResp.ok) return false;
     const versions = findVersionFiles(await modResp.text());
     const latest = versions[versions.length - 1];
@@ -90,12 +117,7 @@ async function fetchAndSetupVersions(): Promise<boolean> {
 async function loadVersion(versionFile: string): Promise<boolean> {
   const blobUrl = `${FEE_CONSTANTS_BLOB_BASE_URL}/${versionFile}`;
   try {
-    if (!cachedVersionConstants[versionFile]) {
-      const resp = await fetch(`${FEE_CONSTANTS_BASE_URL}/${versionFile}`);
-      if (!resp.ok) return false;
-      cachedVersionConstants[versionFile] = parseRustFeeConstants(await resp.text());
-    }
-    activeFeeConstants = cachedVersionConstants[versionFile];
+    activeFeeConstants = await fetchFeeVersion(versionFile);
     ui.setFeeSource('live', versionFile, blobUrl);
     return true;
   } catch {

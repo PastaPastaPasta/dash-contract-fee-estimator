@@ -1,6 +1,8 @@
 import type { FeeEstimate, ParsedContract } from '../lib/types';
 import { creditsToDash, formatCredits } from './formatter';
 import { EXAMPLES } from './examples';
+import { BUNDLED_FEE_TABLE } from '../lib/constants';
+import { encodeContractHandoff } from '../lib/contract-source';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -21,24 +23,38 @@ export function renderApp(container: HTMLElement): {
   onExampleSelect: (handler: (index: number) => void) => void;
   onVersionSelect: (handler: (versionFile: string) => void) => void;
 } {
+  const params = new URLSearchParams(window.location.search);
+  const network = params.get('network') ?? 'mainnet';
+  const rawIdentity = params.get('identity');
+  const identity = rawIdentity && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(rawIdentity) ? rawIdentity : null;
+  const networkLabel = network === 'testnet' ? 'Testnet' : network === 'mainnet' ? 'Mainnet' : network;
+  const bundledSource = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.revision}/packages/rs-platform-version/src/version/fee/data_contract_registration/${BUNDLED_FEE_TABLE.version}`;
+  const sourceDescription = `Fee table: v3 · protocol 14 schedule · bundled source ${BUNDLED_FEE_TABLE.sourceDate} (${BUNDLED_FEE_TABLE.revision.slice(0, 7)}).`;
   container.innerHTML = `
     <div class="page-intro">
-      <p class="tool-links"><a href="${window.dashhq.href('explorer')}">Explorer</a><span>/</span><span>Tools</span><a href="${window.dashhq.href('dapi')}">DAPI console →</a></p>
+      <p class="tool-links"><a href="${window.dashhq.href('explorer', '/', { network: network as 'mainnet' | 'testnet' })}">Explorer</a><span>/</span><span>Tools</span><a href="${window.dashhq.href('dapi', '/', { network: network as 'mainnet' | 'testnet' })}">DAPI console →</a></p>
       <h1>Estimate contract fees</h1>
-      <p>See what a data contract costs to register on Platform. Your JSON stays in this browser.</p>
+      <p>See what a data contract costs to register on Platform. JSON is processed here; Continue to Bridge carries it to the registration flow.</p>
+      ${identity ? `<p class="field-hint">Continue from <a href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, { network: network as 'mainnet' | 'testnet' }))}">your identity in Explorer →</a>. Estimate registration, plan a reserve, then review in Bridge.</p>` : ''}
     </div>
     <div class="fee-source">
-      <p id="fee-source-description">Fee table: v2, bundled with this page.</p>
+      <p id="fee-source-description">${sourceDescription}</p>
+      <p>Schedule versions are independent of network. Check the active protocol before funding; v3 applies from protocol 14, v2 from protocol 9.</p>
       <div class="fee-source-actions">
         <button id="refresh-fees" type="button">Use the latest from GitHub</button>
         <label for="version-select" class="visually-hidden">Fee table version</label>
-        <select id="version-select" disabled><option value="">v2 (bundled)</option></select>
-        <a id="fee-source-link" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">View source</a>
+        <select id="version-select" disabled><option value="v3.rs">v3 (bundled)</option></select>
+        <a id="fee-source-link" href="${bundledSource}" target="_blank" rel="noopener">View source ↗</a>
       </div>
       <p id="refresh-message" role="status"></p>
     </div>
 
     <section class="input-section">
+      <form id="load-contract-form" class="contract-loader">
+        <label for="contract-id">Existing contract ID (base58)</label>
+        <div><input id="contract-id" autocomplete="off" spellcheck="false" required placeholder="Paste a contract ID from Explorer"><button id="load-contract" type="submit">Load contract</button></div>
+        <p id="contract-status" role="status" class="field-hint">Optional: load a public schema from ${esc(networkLabel)}, or paste JSON below.</p>
+      </form>
       <div class="input-header">
         <label for="json-input">Data contract JSON</label>
         <div class="input-actions">
@@ -71,6 +87,7 @@ export function renderApp(container: HTMLElement): {
     <section id="result-section" class="result-section hidden" tabindex="-1" aria-labelledby="result-title">
       <h2 id="result-title">Registration estimate</h2>
       <div id="estimate-total" class="estimate-total" role="status"></div>
+      <p id="estimate-source" class="field-hint">${sourceDescription}</p>
       <p class="field-hint">Itemised registration fees in DASH.</p>
       <table class="fee-table">
         <thead>
@@ -86,6 +103,15 @@ export function renderApp(container: HTMLElement): {
       </table>
 
       <div id="summary-section" class="summary-section"></div>
+      <div class="budget-section">
+        <h3>Plan the funding</h3>
+        <p>The registration estimate is the minimum component. Processing depends on the final transition and signatures; storage depends on bytes and retention. Later document writes, tokens and name contests cost extra. An existing contract’s original registration is already paid.</p>
+        <label for="planned-reserve">Your additional reserve (DASH)</label>
+        <input id="planned-reserve" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Choose a reserve">
+        <p id="funding-plan" class="field-hint" role="status">Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.</p>
+        <p class="field-hint">Next: review the schema, identity, network and current transaction fees in Bridge before signing. ${network === 'mainnet' ? 'Mainnet · real DASH.' : 'Testnet · practice funds have no monetary value.'}</p>
+        <a id="register-contract" class="continue-link">Continue to Bridge on ${esc(networkLabel)} →</a>
+      </div>
 
       <div class="sources-section">
         <h3>Fee reference</h3>
@@ -125,7 +151,17 @@ export function renderApp(container: HTMLElement): {
   const refreshMessage = container.querySelector<HTMLElement>('#refresh-message')!;
   const versionSelect = container.querySelector<HTMLSelectElement>('#version-select')!;
   const feeSourceLink = container.querySelector<HTMLAnchorElement>('#fee-source-link')!;
+  versionSelect.dataset.activeVersion = BUNDLED_FEE_TABLE.version;
   const feeConstantsLink = document.querySelector<HTMLAnchorElement>('#fee-constants-link');
+  if (feeConstantsLink) { feeConstantsLink.href = bundledSource; feeConstantsLink.textContent = 'Fee constants (v3.rs)'; }
+  let registrationDash = 0;
+  const reserve = container.querySelector<HTMLInputElement>('#planned-reserve')!;
+  reserve.addEventListener('input', () => {
+    const amount = Number(reserve.value);
+    container.querySelector('#funding-plan')!.textContent = reserve.value && Number.isFinite(amount) && amount >= 0
+      ? `Planned funding: ${(registrationDash + amount).toLocaleString('en-US', { maximumFractionDigits: 8 })} DASH = registration + your ${amount} DASH reserve. Actual transaction costs may differ.`
+      : 'Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.';
+  });
 
   return {
     getJsonInput: () => jsonInput.value,
@@ -134,6 +170,17 @@ export function renderApp(container: HTMLElement): {
       errorMsg.textContent = '';
       jsonInput.removeAttribute('aria-invalid');
       resultSection.classList.remove('hidden');
+      registrationDash = estimate.totalDash;
+      reserve.dispatchEvent(new Event('input'));
+      const bridgeLink = container.querySelector<HTMLAnchorElement>('#register-contract')!;
+      const encoded = encodeContractHandoff(jsonInput.value);
+      if (encoded.length <= 24000 && (network === 'mainnet' || network === 'testnet')) {
+        bridgeLink.href = window.dashhq.href('bridge', '/?mode=contract&contract=' + encoded + (identity ? '&identity=' + encodeURIComponent(identity) : ''), { network });
+        bridgeLink.textContent = `Continue to Bridge on ${networkLabel} →`;
+      } else {
+        bridgeLink.removeAttribute('href');
+        bridgeLink.textContent = 'Open Bridge from the family menu and paste this schema. It is too large for a link, or this network needs its own Bridge.';
+      }
       container.querySelector('#estimate-total')!.innerHTML = `<strong>${creditsToDash(estimate.totalCredits)} <span>DASH</span></strong><p>${formatCredits(estimate.totalCredits)} credits · registration only</p>`;
 
       feeTbody.innerHTML = estimate.lineItems
@@ -207,6 +254,7 @@ export function renderApp(container: HTMLElement): {
         ['Pre-programmed distribution', c.tokenUsesPreProgrammedDistributionFee],
         ['Search keyword', c.searchKeywordFee],
       ];
+      if (c.tokenUsesOncePerIdentityDistributionFee !== undefined) constRows.push(['Once-per-identity distribution', c.tokenUsesOncePerIdentityDistributionFee]);
       constantsTbody.innerHTML = constRows
         .map(([label, credits]) => `
           <tr>
@@ -230,8 +278,9 @@ export function renderApp(container: HTMLElement): {
     setFeeSource: (source: 'live' | 'bundled', versionFile?: string, sourceUrl?: string) => {
       versionSelect.dataset.activeVersion = versionFile ?? '';
       feeDescription.textContent = source === 'live'
-        ? `Fee table: ${versionFile?.replace('.rs', '')}, fetched from GitHub.`
-        : 'Fee table: v2, bundled with this page.';
+        ? `Fee table: ${versionFile?.replace('.rs', '')} · source ref master · fetched ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC. ${versionFile === 'v3.rs' ? 'Protocol 14+' : versionFile === 'v2.rs' ? 'Protocol 9+' : 'Legacy schedule'}; confirm the active network protocol.`
+        : sourceDescription;
+      container.querySelector('#estimate-source')!.textContent = feeDescription.textContent;
       if (sourceUrl) {
         feeSourceLink.href = sourceUrl;
       }
