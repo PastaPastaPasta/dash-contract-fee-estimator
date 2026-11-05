@@ -5,17 +5,27 @@ import { parseContractJson } from './lib/parser';
 import { findVersionFiles } from './lib/rust-parser';
 import { fetchFeeVersion } from './lib/fee-source';
 import { fetchContract } from './lib/contract-source';
-import { DEFAULT_FEE_CONSTANTS, FEE_CONSTANTS_BASE_URL, FEE_CONSTANTS_BLOB_BASE_URL } from './lib/constants';
+import { FEE_CONSTANTS_BASE_URL, FEE_CONSTANTS_BLOB_BASE_URL } from './lib/constants';
 import type { FeeConstants } from './lib/types';
 import { renderApp } from './ui/components';
+import { BUNDLED_SCHEDULES, readCurrentProtocol, scheduleForProtocol } from './lib/schedules';
 import { EXAMPLES } from './ui/examples';
 
-let activeFeeConstants: FeeConstants = DEFAULT_FEE_CONSTANTS;
+let activeVersion = 'v2.rs';
+let activeFeeConstants: FeeConstants = BUNDLED_SCHEDULES[activeVersion];
+let protocol: number | null = null;
+let manualVersion = false;
+let protocolReadAt = '';
+const network = new URLSearchParams(location.search).get('network') ?? 'mainnet';
 
 const app = document.getElementById('app')!;
 const ui = renderApp(app);
 const params = new URLSearchParams(window.location.search);
-document.querySelector('dashhq-bar')!.setAttribute('network', params.get('network') ?? 'mainnet');
+document.querySelector('dashhq-bar')!.setAttribute('network', network);
+ui.setVersionOptions(Object.keys(BUNDLED_SCHEDULES), activeVersion);
+ui.setFeeSource('bundled', activeVersion);
+updateProtocolLabel('Reading the selected network’s current protocol…');
+void syncProtocol();
 const contractInput = app.querySelector<HTMLInputElement>('#contract-id')!;
 const contractStatus = app.querySelector<HTMLElement>('#contract-status')!;
 const loadContractButton = app.querySelector<HTMLButtonElement>('#load-contract')!;
@@ -43,6 +53,7 @@ if (contractInput.value) app.querySelector<HTMLFormElement>('#load-contract-form
 
 ui.onRefresh(async () => {
   ui.setRefreshState(true);
+  await syncProtocol();
   const loaded = await fetchAndSetupVersions();
   ui.setRefreshState(false, loaded ? 'Fee table updated from GitHub.' : 'Couldn’t update the fee table. The current table is still in use. Try again shortly.');
   if (ui.getJsonInput().trim()) runEstimate();
@@ -56,9 +67,11 @@ ui.onExampleSelect((index) => {
   ui.revealResult();
 });
 ui.onVersionSelect(async (versionFile) => {
+  manualVersion = true;
   ui.setRefreshState(true);
   const loaded = await loadVersion(versionFile);
   ui.setRefreshState(false, loaded ? '' : 'Couldn’t load that version. The previous fee table is still in use.');
+  updateProtocolLabel();
   if (ui.getJsonInput().trim()) runEstimate();
 });
 
@@ -105,22 +118,51 @@ async function fetchAndSetupVersions(): Promise<boolean> {
     const modResp = await fetch(`${FEE_CONSTANTS_BASE_URL}/mod.rs`, { signal: AbortSignal.timeout(12000) });
     if (!modResp.ok) return false;
     const versions = findVersionFiles(await modResp.text());
-    const latest = versions[versions.length - 1];
-    if (!latest || !await loadVersion(latest)) return false;
-    ui.setVersionOptions(versions, latest);
+    if (!versions.includes(activeVersion) || !await loadVersion(activeVersion, true)) return false;
+    ui.setVersionOptions([...new Set([...Object.keys(BUNDLED_SCHEDULES), ...versions])], activeVersion);
     return true;
   } catch {
     return false;
   }
 }
 
-async function loadVersion(versionFile: string): Promise<boolean> {
+async function loadVersion(versionFile: string, refresh = false): Promise<boolean> {
+  if (!refresh && BUNDLED_SCHEDULES[versionFile]) {
+    activeVersion = versionFile;
+    activeFeeConstants = BUNDLED_SCHEDULES[versionFile];
+    ui.setFeeSource('bundled', versionFile);
+    return true;
+  }
   const blobUrl = `${FEE_CONSTANTS_BLOB_BASE_URL}/${versionFile}`;
   try {
-    activeFeeConstants = await fetchFeeVersion(versionFile);
+    const constants = await fetchFeeVersion(versionFile);
+    activeVersion = versionFile;
+    activeFeeConstants = constants;
     ui.setFeeSource('live', versionFile, blobUrl);
     return true;
   } catch {
     return false;
   }
+}
+
+function updateProtocolLabel(message?: string) {
+  const expected = protocol === null ? null : scheduleForProtocol(protocol);
+  const text = message ?? (protocol === null
+    ? `${network}: current protocol unconfirmed. Selected schedule ${activeVersion.replace('.rs','')} is provisional; retry the network check before funding.`
+    : `${network}: Platform reports protocol ${protocol} (read ${protocolReadAt} UTC). ${expected === activeVersion ? 'The selected schedule applies to this protocol.' : 'Hypothetical estimate: the selected schedule is not confirmed for this network. Choose the current schedule before funding.'}`);
+  ui.setProtocolStatus(text);
+}
+
+async function syncProtocol() {
+  try {
+    protocol = await readCurrentProtocol(network);
+    protocolReadAt = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const version = scheduleForProtocol(protocol);
+    if (!manualVersion && version) {
+      await loadVersion(version);
+      ui.setVersionOptions(Object.keys(BUNDLED_SCHEDULES), version);
+    }
+  } catch { protocol = null; }
+  updateProtocolLabel();
+  if (ui.getJsonInput().trim()) runEstimate();
 }

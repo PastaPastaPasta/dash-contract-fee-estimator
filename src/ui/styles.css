@@ -1,6 +1,6 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--dh-page); color: var(--dh-ink); font: 15px/1.5 var(--dh-font); }
-#app { max-width: 1000px; padding: 28px var(--dh-gutter) 48px; margin: auto; }
+#app { max-width: var(--dh-max); padding: 28px var(--dh-gutter) 48px; margin: auto; }
 h1, h2, h3, p { margin: 0; }
 h1 { font-size: 30px; line-height: 1.2; font-weight: 660; font-stretch: 110%; letter-spacing: -.015em; margin: 12px 0 8px; }
 h2 { font-size: 21px; font-weight: 660; font-stretch: 110%; margin-bottom: 16px; }
