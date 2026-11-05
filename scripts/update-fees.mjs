@@ -16,13 +16,18 @@ const FIELD_MAP = {
   token_registration_fee: 'tokenRegistrationFee',
   token_uses_perpetual_distribution_fee: 'tokenUsesPerpetualDistributionFee',
   token_uses_pre_programmed_distribution_fee: 'tokenUsesPreProgrammedDistributionFee',
+  token_uses_once_per_identity_distribution_fee: 'tokenUsesOncePerIdentityDistributionFee',
   search_keyword_fee: 'searchKeywordFee',
 };
 
 async function main() {
+  const commitResponse = await fetch('https://api.github.com/repos/dashpay/platform/commits/master', { headers: { 'User-Agent': 'dash-fee-estimator' }, signal: AbortSignal.timeout(12000) });
+  if (!commitResponse.ok) throw new Error(`Could not resolve source revision: ${commitResponse.status}`);
+  const commit = await commitResponse.json();
+  const pinnedBase = BASE_URL.replace('/master/', `/${commit.sha}/`);
   // Discover latest version from mod.rs
   console.log('Fetching mod.rs to discover versions...');
-  const modResp = await fetch(`${BASE_URL}/mod.rs`);
+  const modResp = await fetch(`${pinnedBase}/mod.rs`, { signal: AbortSignal.timeout(12000) });
   if (!modResp.ok) throw new Error(`Failed to fetch mod.rs: ${modResp.status}`);
   const modSource = await modResp.text();
 
@@ -36,29 +41,23 @@ async function main() {
   if (highest === 0) throw new Error('No version modules found in mod.rs');
 
   const versionFile = `v${highest}.rs`;
-  const sourceUrl = `${BASE_URL}/${versionFile}`;
-  console.log(`Latest version: ${versionFile}`);
-  console.log('Fetching fee constants from:', sourceUrl);
-
-  const resp = await fetch(sourceUrl);
-  if (!resp.ok) throw new Error(`Failed to fetch: ${resp.status} ${resp.statusText}`);
-
-  const source = await resp.text();
-  const fieldPattern = /(\w+):\s*([\d_]+)/g;
-  const parsed = {};
-
-  while ((match = fieldPattern.exec(source)) !== null) {
-    const [, fieldName, rawValue] = match;
-    if (fieldName in FIELD_MAP) {
-      parsed[fieldName] = Number(rawValue.replace(/_/g, ''));
+  async function readVersion(file, seen = new Set()) {
+    if (!/^v\d+\.rs$/.test(file) || seen.has(file) || seen.size > 10) throw new Error('Invalid fee table inheritance');
+    seen.add(file);
+    const response = await fetch(`${pinnedBase}/${file}`, { signal: AbortSignal.timeout(12000) });
+    if (!response.ok) throw new Error(`Fee table ${file}: ${response.status}`);
+    const source = await response.text();
+    const parent = source.match(/\.\.FEE_DATA_CONTRACT_REGISTRATION_VERSION(\d+)\b/);
+    const parsed = parent ? await readVersion(`v${parent[1]}.rs`, seen) : {};
+    for (const [, name, value] of source.matchAll(/(\w+):\s*([\d_]+)/g)) {
+      if (name in FIELD_MAP) parsed[name] = Number(value.replace(/_/g, ''));
+      else if (name.endsWith('_fee')) throw new Error(`Unsupported fee field: ${name}`);
     }
+    return parsed;
   }
-
-  const missing = Object.keys(FIELD_MAP).filter((f) => !(f in parsed));
-  if (missing.length > 0) {
-    throw new Error(`Missing fee fields in source: ${missing.join(', ')}`);
-  }
-
+  const parsed = await readVersion(versionFile);
+  const missing = Object.keys(FIELD_MAP).filter((field) => field !== 'token_uses_once_per_identity_distribution_fee' && !(field in parsed));
+  if (missing.length) throw new Error(`Missing fee fields: ${missing.join(', ')}`);
   const formatNum = (n) => {
     const s = String(n);
     if (s.length <= 3) return s;
@@ -67,7 +66,7 @@ async function main() {
 
   const toDash = (n) => n / 100_000_000_000;
 
-  const lines = Object.entries(FIELD_MAP).map(([rustName, camelName]) => {
+  const lines = Object.entries(FIELD_MAP).filter(([name]) => name in parsed).map(([rustName, camelName]) => {
     const val = parsed[rustName];
     const dash = toDash(val);
     return `  ${camelName}: ${formatNum(val)}, // ${dash} Dash`;
@@ -78,6 +77,12 @@ async function main() {
 /** Bundled fee constants (${versionFile}) - auto-updated by CI */
 export const DEFAULT_FEE_CONSTANTS: FeeConstants = {
 ${lines.join('\n')}
+};
+
+export const BUNDLED_FEE_TABLE = {
+  version: '${versionFile}',
+  revision: '${commit.sha}',
+  sourceDate: '${new Date(commit.commit.committer.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}',
 };
 
 /** Base directory URL for fee constant source files in DPP */

@@ -1,16 +1,23 @@
 import type { FeeConstants } from './types';
 
-/** Bundled fee constants from protocol version 9 (Dash 2.0) - auto-updated by CI */
+/** Bundled fee constants (v3.rs) - auto-updated by CI */
 export const DEFAULT_FEE_CONSTANTS: FeeConstants = {
   baseContractRegistrationFee: 10_000_000_000, // 0.1 Dash
   documentTypeRegistrationFee: 2_000_000_000, // 0.02 Dash
   documentTypeBaseNonUniqueIndexRegistrationFee: 1_000_000_000, // 0.01 Dash
   documentTypeBaseUniqueIndexRegistrationFee: 1_000_000_000, // 0.01 Dash
-  documentTypeBaseContestedIndexRegistrationFee: 100_000_000_000, // 1.0 Dash
+  documentTypeBaseContestedIndexRegistrationFee: 100_000_000_000, // 1 Dash
   tokenRegistrationFee: 10_000_000_000, // 0.1 Dash
   tokenUsesPerpetualDistributionFee: 10_000_000_000, // 0.1 Dash
   tokenUsesPreProgrammedDistributionFee: 10_000_000_000, // 0.1 Dash
+  tokenUsesOncePerIdentityDistributionFee: 10_000_000_000, // 0.1 Dash
   searchKeywordFee: 10_000_000_000, // 0.1 Dash
+};
+
+export const BUNDLED_FEE_TABLE = {
+  version: 'v3.rs',
+  revision: 'a75650f105274b7335eadc2d26bf08939673d084',
+  sourceDate: '27 Oct 2026',
 };
 
 /** Base directory URL for fee constant source files in DPP */

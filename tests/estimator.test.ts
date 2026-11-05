@@ -7,6 +7,13 @@ import dpnsContestedContract from './fixtures/dpns-contract-contested-unique-ind
 import tokenContract from './fixtures/token-example-contract.json';
 
 describe('estimateContractFee', () => {
+  it('includes the protocol 14 once-per-identity surcharge', () => {
+    const contract = { tokens: { '0': { distributionRules: { oncePerIdentityDistribution: {} } } } };
+    const result = estimateContractFee(contract);
+    expect(result.totalDash).toBeCloseTo(0.3);
+    expect(result.lineItems.find((item) => item.label === 'Once-per-identity distribution')?.count).toBe(1);
+    expect(() => estimateContractFee(contract, { ...result.constants, tokenUsesOncePerIdentityDistributionFee: undefined })).toThrow(/protocol 14/);
+  });
   it('returns base fee for empty contract', () => {
     const result = estimateContractFee({ documentSchemas: {} });
     expect(result.totalCredits).toBe(10_000_000_000);

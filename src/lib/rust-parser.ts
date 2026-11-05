@@ -10,38 +10,45 @@ const FIELD_MAP: Record<string, keyof FeeConstants> = {
   token_registration_fee: 'tokenRegistrationFee',
   token_uses_perpetual_distribution_fee: 'tokenUsesPerpetualDistributionFee',
   token_uses_pre_programmed_distribution_fee: 'tokenUsesPreProgrammedDistributionFee',
+  token_uses_once_per_identity_distribution_fee: 'tokenUsesOncePerIdentityDistributionFee',
   search_keyword_fee: 'searchKeywordFee',
 };
 
-const EXPECTED_FIELDS = Object.keys(FIELD_MAP);
+const EXPECTED_FIELDS = Object.keys(FIELD_MAP).filter((field) => field !== 'token_uses_once_per_identity_distribution_fee');
 
 /**
  * Parse a Rust source file (like v2.rs) to extract fee constants.
  * Matches lines of the form: `field_name: 10_000_000_000,`
  */
-export function parseRustFeeConstants(rustSource: string): FeeConstants {
+export function parseRustFeeConstants(rustSource: string, inherited?: FeeConstants): FeeConstants {
   const fieldPattern = /(\w+):\s*([\d_]+)/g;
   const parsed: Record<string, number> = {};
 
   let match;
   while ((match = fieldPattern.exec(rustSource)) !== null) {
     const [, fieldName, rawValue] = match;
+    if (fieldName.endsWith('_fee') && !(fieldName in FIELD_MAP)) throw new Error(`Unsupported fee field: ${fieldName}`);
     if (fieldName in FIELD_MAP) {
       parsed[fieldName] = Number(rawValue.replace(/_/g, ''));
     }
   }
 
-  const missing = EXPECTED_FIELDS.filter((f) => !(f in parsed));
+  const missing = EXPECTED_FIELDS.filter((f) => !(f in parsed) && inherited?.[FIELD_MAP[f]] === undefined);
   if (missing.length > 0) {
     throw new Error(`Missing fee fields in Rust source: ${missing.join(', ')}`);
   }
 
-  const result = {} as FeeConstants;
+  const result = { ...inherited } as FeeConstants;
   for (const [rustName, camelName] of Object.entries(FIELD_MAP)) {
-    result[camelName] = parsed[rustName];
+    if (rustName in parsed) result[camelName] = parsed[rustName];
   }
 
   return result;
+}
+
+export function inheritedFeeVersion(source: string): string | undefined {
+  const match = source.match(/\.\.FEE_DATA_CONTRACT_REGISTRATION_VERSION(\d+)\b/);
+  return match ? `v${match[1]}.rs` : undefined;
 }
 
 /**

@@ -11,6 +11,7 @@ export interface FeeConstants {
   tokenRegistrationFee: number;
   tokenUsesPerpetualDistributionFee: number;
   tokenUsesPreProgrammedDistributionFee: number;
+  tokenUsesOncePerIdentityDistributionFee?: number;
   searchKeywordFee: number;
 }
 
@@ -49,6 +50,7 @@ export interface TokenInfo {
   position: string;
   hasPerpetualDistribution: boolean;
   hasPreProgrammedDistribution: boolean;
+  hasOncePerIdentityDistribution?: boolean;
 }
 
 /** Intermediate parsed representation of a contract */

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseRustFeeConstants, findVersionFiles, findLatestVersionFile } from '../src/lib/rust-parser';
+import { parseRustFeeConstants, findVersionFiles, findLatestVersionFile, inheritedFeeVersion } from '../src/lib/rust-parser';
 
 const v2Source = readFileSync(
   resolve(__dirname, 'fixtures/fee-constants-v2.rs'),
@@ -9,6 +9,13 @@ const v2Source = readFileSync(
 );
 
 describe('parseRustFeeConstants', () => {
+  it('resolves the current v3 schedule through its v2 parent', () => {
+    const source = 'token_uses_once_per_identity_distribution_fee: 10_000_000_000, ..FEE_DATA_CONTRACT_REGISTRATION_VERSION2';
+    expect(inheritedFeeVersion(source)).toBe('v2.rs');
+    const constants = parseRustFeeConstants(source, parseRustFeeConstants(v2Source));
+    expect(constants.baseContractRegistrationFee).toBe(10_000_000_000);
+    expect(constants.tokenUsesOncePerIdentityDistributionFee).toBe(10_000_000_000);
+  });
   it('parses all fields from v2.rs', () => {
     const constants = parseRustFeeConstants(v2Source);
     expect(constants.baseContractRegistrationFee).toBe(10_000_000_000);
