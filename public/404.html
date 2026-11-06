@@ -16,13 +16,15 @@
 </head>
 <body class="dh-fill">
 <a class="skip" href="#main">Skip to content</a>
-<dashhq-bar product="fees" network="mainnet" networks="mainnet testnet" sticky></dashhq-bar>
+<dashhq-bar product="fees" network="mainnet" sticky></dashhq-bar>
 <main id="main" class="dh-container dh-page"><div class="dh-narrow">
 <dashhq-moved product="fees" to="explorer" path="/tools/fees/" heading="Fee estimator moved to Explorer" lede="Same calculator, now beside your contracts and identities. Your network and contract stay with you." label="Open the fee estimator">
-<h1>Fee estimator moved to Explorer</h1><p>Same calculator, now beside your contracts and identities. Your network and contract stay with you.</p><p><a href="https://explorer.dashhq.org/tools/fees/?network=mainnet">Open the fee estimator →</a></p>
+<h1 class="dh-page-header__title">Fee estimator moved to Explorer</h1>
+<p class="dh-page-header__lede">Same calculator, now beside your contracts and identities. Your network and contract stay with you.</p>
+<p><a class="dh-btn dh-btn--primary" href="https://explorer.dashhq.org/tools/fees/?network=mainnet&amp;moved-from=fees">Open the fee estimator →</a></p>
 </dashhq-moved>
 
-<noscript><p>JavaScript is off. Use the link above, then select your network in Explorer.</p></noscript>
+<noscript><p>JavaScript is off, so this page can't carry your contract across. The link above opens the fee estimator on Mainnet.</p></noscript>
 </div></main>
 <dashhq-footer product="fees" source="https://github.com/PastaPastaPasta/dash-contract-fee-estimator"></dashhq-footer>
 </body>
