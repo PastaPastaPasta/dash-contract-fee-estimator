@@ -70,7 +70,7 @@ export function renderPlan(
     <div class="dh-field">
       <label class="dh-field__label" for="fee-reserve">Operating reserve (${unit}) · editable</label>
       <div class="dh-inline-form">
-        <input id="fee-reserve" class="dh-input" type="number" min="0" step="any" inputmode="decimal">
+        <input id="fee-reserve" class="dh-input" type="number" min="0" step="any" inputmode="decimal" value="${esc(manualReserve ?? '')}">
         <button class="dh-btn" type="button" id="use-suggested" hidden>Use suggested reserve</button>
       </div>
     </div>
