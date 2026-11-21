@@ -8,13 +8,16 @@ import { CREDITS_PER_DASH } from './types';
  * Mirrors `registration_cost_v1` from rs-dpp.
  *
  * @param contract - Either a raw contract JSON object or a pre-parsed ParsedContract
- * @param constants - Optional fee constants override (defaults to bundled v2 constants)
+ * @param constants - Optional fee constants override (defaults to bundled v3 constants)
  */
 export function estimateContractFee(
   contract: ParsedContract | Record<string, unknown>,
   constants: FeeConstants = DEFAULT_FEE_CONSTANTS,
 ): FeeEstimate {
   const parsed = isParsedContract(contract) ? contract : parseContractJson(contract);
+  if (parsed.tokens.some((token) => token.hasOncePerIdentityDistribution) && !constants.tokenUsesOncePerIdentityDistributionFee) {
+    throw new Error('Once-per-identity distribution requires the v3 fee table (protocol 14 and later). Select v3.');
+  }
   const lineItems: FeeLineItem[] = [];
 
   // Base contract registration fee
@@ -107,6 +110,11 @@ export function estimateContractFee(
     }
 
     const preProgrammedCount = parsed.tokens.filter((t) => t.hasPreProgrammedDistribution).length;
+    const oncePerIdentityCount = parsed.tokens.filter((t) => t.hasOncePerIdentityDistribution).length;
+    if (oncePerIdentityCount > 0) {
+      const fee = constants.tokenUsesOncePerIdentityDistributionFee!;
+      lineItems.push({ label: 'Once-per-identity distribution', description: 'Per token using once-per-identity distribution (from protocol 14)', count: oncePerIdentityCount, unitCostCredits: fee, totalCostCredits: oncePerIdentityCount * fee });
+    }
     if (preProgrammedCount > 0) {
       lineItems.push({
         label: 'Pre-programmed distribution',

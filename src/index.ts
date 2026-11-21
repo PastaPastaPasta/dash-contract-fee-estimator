@@ -12,3 +12,8 @@ export type {
   IndexInfo,
   TokenInfo,
 } from './lib/types';
+export { BUNDLED_SCHEDULES, scheduleForProtocol, scheduleLabel } from './lib/schedules';
+export { BUNDLED_FEE_TABLE, FEE_CONSTANTS_PATH } from './lib/constants';
+export { fetchFeeVersion, fetchVersionFiles, latestStableRelease, feeFileUrl, feeBlobUrl } from './lib/fee-source';
+export { encodeContractHandoff } from './lib/contract-source';
+export { EXAMPLES } from './ui/examples';

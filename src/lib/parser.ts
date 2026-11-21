@@ -87,6 +87,7 @@ function parseTokens(tokens: unknown): TokenInfo[] {
       position,
       hasPerpetualDistribution: distRules.perpetualDistribution != null,
       hasPreProgrammedDistribution: distRules.preProgrammedDistribution != null,
+      ...(distRules.oncePerIdentityDistribution != null ? { hasOncePerIdentityDistribution: true } : {}),
     };
   });
 }

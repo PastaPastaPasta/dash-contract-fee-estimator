@@ -6,7 +6,16 @@ export interface Example {
 
 export const EXAMPLES: Example[] = [
   {
-    name: 'DPNS (Dash Platform Name Service)',
+    name: 'First app · a short note',
+    description: 'One document type, no custom indices or tokens',
+    json: { documentSchemas: { note: {
+      type: 'object', documentsMutable: true, canBeDeleted: true,
+      properties: { text: { type: 'string', maxLength: 280 } },
+      required: ['text'], additionalProperties: false,
+    } } },
+  },
+  {
+    name: 'Advanced · DPNS (includes contested registration)',
     description: '2 document types, 1 contested index, 1 unique, 1 non-unique',
     json: {
       documentSchemas: {

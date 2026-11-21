@@ -6,6 +6,7 @@ const isLibBuild = process.env.BUILD_LIB === 'true';
 export default defineConfig(
   isLibBuild
     ? {
+        publicDir: false,
         build: {
           lib: {
             entry: resolve(__dirname, 'src/index.ts'),

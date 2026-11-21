@@ -5,10 +5,24 @@ import type { FeeConstants, ParsedContract } from '../src/lib/types';
 import dpnsContract from './fixtures/dpns-contract.json';
 import dpnsContestedContract from './fixtures/dpns-contract-contested-unique-index.json';
 import tokenContract from './fixtures/token-example-contract.json';
+import { PLATFORM_V5_0_3 } from './fixtures/platform-v5.0.3';
+import { DEFAULT_FEE_CONSTANTS } from '../src/lib/constants';
+
+const { v3 } = PLATFORM_V5_0_3;
 
 describe('estimateContractFee', () => {
+  it('includes the protocol 14 once-per-identity surcharge', () => {
+    const contract = { tokens: { '0': { distributionRules: { oncePerIdentityDistribution: {} } } } };
+    const result = estimateContractFee(contract, v3);
+    expect(result.totalDash).toBeCloseTo(0.3);
+    expect(result.lineItems.find((item) => item.label === 'Once-per-identity distribution')?.count).toBe(1);
+    expect(() => estimateContractFee(contract, { ...result.constants, tokenUsesOncePerIdentityDistributionFee: undefined })).toThrow(/protocol 14/);
+  });
+  it('defaults to the bundled fee table', () => {
+    expect(estimateContractFee({ documentSchemas: {} }).constants).toBe(DEFAULT_FEE_CONSTANTS);
+  });
   it('returns base fee for empty contract', () => {
-    const result = estimateContractFee({ documentSchemas: {} });
+    const result = estimateContractFee({ documentSchemas: {} }, v3);
     expect(result.totalCredits).toBe(10_000_000_000);
     expect(result.totalDash).toBeCloseTo(0.1);
     expect(result.lineItems).toHaveLength(1);
@@ -16,7 +30,7 @@ describe('estimateContractFee', () => {
   });
 
   it('calculates fees for DPNS contract (2 doc types, mixed indexes)', () => {
-    const result = estimateContractFee(dpnsContract);
+    const result = estimateContractFee(dpnsContract, v3);
     // base: 10B + 2 doc types: 4B + 2 unique indexes: 2B + 1 non-unique: 1B + 1 unique (preorder): already counted
     // domain: parentNameAndLabel (unique), dashIdentityId (unique), dashAlias (non-unique) = 3 indexes
     // preorder: saltedHash (unique) = 1 index
@@ -26,7 +40,7 @@ describe('estimateContractFee', () => {
   });
 
   it('calculates fees for DPNS contested contract', () => {
-    const result = estimateContractFee(dpnsContestedContract);
+    const result = estimateContractFee(dpnsContestedContract, v3);
     // domain: parentNameAndLabel (contested), identityId (non-unique) = 2 indexes
     // preorder: saltedHash (unique) = 1 index
     // 2 doc types
@@ -40,7 +54,7 @@ describe('estimateContractFee', () => {
   });
 
   it('calculates fees for token contract', () => {
-    const result = estimateContractFee(tokenContract);
+    const result = estimateContractFee(tokenContract, v3);
     // No document schemas (empty), 1 token, no distribution rules visible
     // base: 10B + 1 token: 10B = 20B
     expect(result.totalCredits).toBe(20_000_000_000);
@@ -58,7 +72,7 @@ describe('estimateContractFee', () => {
         },
       },
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     // base: 10B + 1 token: 10B + 1 perpetual: 10B = 30B
     expect(result.totalCredits).toBe(30_000_000_000);
   });
@@ -74,7 +88,7 @@ describe('estimateContractFee', () => {
         },
       },
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     // base: 10B + 1 token: 10B + 1 pre-programmed: 10B = 30B
     expect(result.totalCredits).toBe(30_000_000_000);
   });
@@ -91,7 +105,7 @@ describe('estimateContractFee', () => {
         },
       },
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     // base: 10B + 1 token: 10B + perpetual: 10B + preProgrammed: 10B = 40B
     expect(result.totalCredits).toBe(40_000_000_000);
   });
@@ -101,7 +115,7 @@ describe('estimateContractFee', () => {
       documentSchemas: {},
       keywords: ['defi', 'payments', 'wallet'],
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     // base: 10B + 3 keywords: 30B = 40B
     expect(result.totalCredits).toBe(40_000_000_000);
     const kwItem = result.lineItems.find((i) => i.label === 'Search keywords');
@@ -128,7 +142,7 @@ describe('estimateContractFee', () => {
       },
       keywords: ['social', 'profile'],
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     // base: 10B + 1 doc: 2B + 1 unique: 1B + 1 nonunique: 1B
     // + 1 token: 10B + 1 perpetual: 10B + 2 keywords: 20B = 54B
     expect(result.totalCredits).toBe(54_000_000_000);
@@ -159,13 +173,13 @@ describe('estimateContractFee', () => {
       tokens: [],
       keywords: [],
     };
-    const result = estimateContractFee(parsed);
+    const result = estimateContractFee(parsed, v3);
     // base: 10B + 1 doc: 2B + 1 unique: 1B = 13B
     expect(result.totalCredits).toBe(13_000_000_000);
   });
 
   it('returns totalDash correctly', () => {
-    const result = estimateContractFee({ documentSchemas: {} });
+    const result = estimateContractFee({ documentSchemas: {} }, v3);
     expect(result.totalDash).toBe(result.totalCredits / CREDITS_PER_DASH);
   });
 
@@ -183,7 +197,7 @@ describe('estimateContractFee', () => {
       tokens: { '0': { distributionRules: { perpetualDistribution: {} } } },
       keywords: ['test'],
     };
-    const result = estimateContractFee(contract);
+    const result = estimateContractFee(contract, v3);
     const sum = result.lineItems.reduce((s, i) => s + i.totalCostCredits, 0);
     expect(sum).toBe(result.totalCredits);
   });
