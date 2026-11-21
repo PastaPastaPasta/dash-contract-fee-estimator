@@ -4,15 +4,27 @@ import { esc, number } from './formatter';
 
 type Activity = { creates: string; updates: string; bytes: string };
 const activity = new Map<string, Activity>();
+let contract: string | null = null;
 let months = '3';
 let manualReserve: string | null = null;
 
-export type PlanState = { activity: [string, Activity][]; months: string; manualReserve: string | null };
-export const planState = (): PlanState => ({ activity: [...activity], months, manualReserve });
-export function restorePlan(state: PlanState) {
-  for (const [name, values] of state.activity) activity.set(name, values);
-  months = state.months;
-  manualReserve = state.manualReserve;
+export type PlanState = { contract: string | null; activity: [string, Activity][]; months: string; manualReserve: string | null };
+export const planState = (): PlanState => ({ contract, activity: [...activity], months, manualReserve });
+
+const isText = (value: unknown): value is string => typeof value === 'string';
+const isActivity = (value: unknown): value is Activity =>
+  !!value && typeof value === 'object' && (['creates', 'updates', 'bytes'] as const).every((field) => isText((value as Activity)[field]));
+
+export function restorePlan(state: unknown): boolean {
+  const s = state as Partial<PlanState> | null;
+  if (!s || typeof s !== 'object' || !isText(s.contract) || !isText(s.months) || !(s.manualReserve === null || isText(s.manualReserve))) return false;
+  if (!Array.isArray(s.activity) || !s.activity.every((entry) => Array.isArray(entry) && entry.length === 2 && isText(entry[0]) && isActivity(entry[1]))) return false;
+  activity.clear();
+  for (const [name, values] of s.activity) activity.set(name, { creates: values.creates, updates: values.updates, bytes: values.bytes });
+  contract = s.contract;
+  months = s.months;
+  manualReserve = s.manualReserve;
+  return true;
 }
 
 const headline = (value: number) =>
@@ -28,6 +40,12 @@ export function renderPlan(
 ): void {
   const schemas = (source.documentSchemas ?? source) as Record<string, { documentsMutable?: boolean }>;
   const config = source.config as { documentsMutableContractDefault?: boolean } | undefined;
+  const key = JSON.stringify(source);
+  if (key !== contract) {
+    contract = key;
+    activity.clear();
+    manualReserve = null;
+  }
   const types = parsed.documentTypes.map((type) => {
     const mutable = schemas[type.name]?.documentsMutable ?? config?.documentsMutableContractDefault ?? true;
     if (!activity.has(type.name)) {
@@ -103,13 +121,13 @@ export function renderPlan(
         : 'Use whole counts of zero or more and a positive document size within the supported range.';
       monthly = estimate && monthly !== null ? monthly + estimate.credits : null;
     });
-    const duration = wholeNumber(months, 1);
+    const duration = types.length === 0 ? 1 : wholeNumber(months, 1);
     const total = monthly !== null && duration !== null ? monthly * duration : null;
     const suggested = total !== null && Number.isSafeInteger(Math.ceil(total * 1.25)) ? Math.ceil(total * 1.25) : null;
     container.querySelector('#plan-costs')!.innerHTML = suggested !== null && monthly !== null && total !== null
-      ? `<dl class="dh-kv dh-kv--grid" aria-label="Expected operating cost">
+      ? `<dl class="dh-kv dh-kv--grid" aria-label="Expected operating cost">${types.length === 0 ? '' : `
           <div><dt>Monthly operating cost</dt><dd>≈ ${number(monthly / CREDITS_PER_DASH)} ${unit}<small class="fee-item-note">${number(monthly)} credits</small></dd></div>
-          <div><dt>Operating cost over ${esc(months)} months</dt><dd>≈ ${number(total / CREDITS_PER_DASH)} ${unit}<small class="fee-item-note">${number(total)} credits</small></dd></div>
+          <div><dt>Operating cost over ${esc(months)} months</dt><dd>≈ ${number(total / CREDITS_PER_DASH)} ${unit}<small class="fee-item-note">${number(total)} credits</small></dd></div>`}
           <div><dt>Suggested reserve · includes 25% buffer</dt><dd>${number(suggested / CREDITS_PER_DASH)} ${unit}</dd></div>
         </dl>`
       : '<p role="status">Enter valid activity and months to calculate an operating estimate.</p>';

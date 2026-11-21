@@ -74,7 +74,7 @@ export function renderApp(container: HTMLElement, network: string, identity: str
       <div class="dh-field">
         <label class="dh-field__label" for="version-select">Fee schedule</label>
         <select class="dh-select" id="version-select"></select>
-        <p class="dh-field__help">Bundled tables come from Platform ${BUNDLED_FEE_TABLE.tag}, the newest stable release when this site was built. Historical schedules are comparisons, not current funding quotes.</p>
+        <p class="dh-field__help">Bundled tables come from Platform ${BUNDLED_FEE_TABLE.tag}. Refresh to check for a newer stable release. Historical schedules are comparisons, not current funding quotes.</p>
       </div>
       <div class="dh-actions">
         <button class="dh-btn" id="refresh-fees" type="button">Refresh protocol and fee source</button>

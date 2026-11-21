@@ -36,12 +36,12 @@ const current = () => (protocol === null ? null : scheduleForProtocol(protocol))
 const selected = () => manual || current() || BUNDLED_FEE_TABLE.version;
 const tableFor = (version: string) =>
   live[version] ?? { constants: BUNDLED_SCHEDULES[version], source: { version, ref: BUNDLED_FEE_TABLE.tag, live: false } };
-const confirmed = () => !!current() && selected() === current();
+const confirmed = () => !manual && !!current();
 
 function refreshStatus() {
   const schedule = current();
-  const [message, warn] = manual && manual !== schedule
-    ? [`Hypothetical · ${scheduleLabel(manual)}. ${schedule ? `${networkLabel} runs protocol ${protocol}, which uses ${scheduleLabel(schedule)}.` : 'Choose the automatic schedule before funding.'}`, true]
+  const [message, warn] = manual
+    ? [`Hypothetical · ${scheduleLabel(manual)}, chosen by hand. ${schedule ? `${networkLabel} runs protocol ${protocol}, which uses ${scheduleLabel(schedule)}. ` : ''}Choose the automatic schedule before funding.`, true]
     : schedule
       ? [`${networkLabel} · protocol ${protocol} (read ${protocolReadAt} UTC) · current schedule ${scheduleLabel(schedule)}`, false]
       : protocolError
@@ -55,7 +55,7 @@ function refreshStatus() {
 }
 
 function handoff(json: string, totalCredits: number): Handoff {
-  if (!confirmed()) return { reason: 'Choose the current confirmed schedule before continuing to Bridge. Wait for the network check or refresh it in Schedule and sources.' };
+  if (!confirmed()) return { reason: 'Continuing to Bridge needs the automatic schedule, confirmed from the network’s protocol. Choose it in Schedule and sources, and wait for the network check or refresh it.' };
   const encoded = encodeContractHandoff(json);
   if (encoded.length > 24000 || !(network === 'mainnet' || network === 'testnet')) {
     return { reason: 'This schema is too large for a link, or this network needs its own Bridge. Copy the JSON and import it in Bridge.' };
@@ -124,10 +124,14 @@ ui.onRefresh(async () => {
     versions = [...new Set([...Object.keys(BUNDLED_SCHEDULES), ...(await fetchVersionFiles(ref))])];
     await loadLive(selected(), ref);
     message = ref === BUNDLED_FEE_TABLE.tag
-      ? `Fee table read from Platform ${ref}, the bundled release.`
-      : `Fee table read from Platform ${ref}, newer than the bundled ${BUNDLED_FEE_TABLE.tag}.`;
+      ? `Fee table read from Platform ${ref}, the newest stable release and the one bundled here.`
+      : `Fee table read from Platform ${ref}, the newest stable release, which is newer than the bundled ${BUNDLED_FEE_TABLE.tag}.`;
   } catch {
-    message = `Couldn’t read the fee source from GitHub. The bundled table from Platform ${BUNDLED_FEE_TABLE.tag} is still in use. Try again shortly.`;
+    const { source } = tableFor(selected());
+    const inUse = source.live
+      ? `The table read from Platform ${source.ref} at ${source.fetchedAt} UTC is still in use.`
+      : `The bundled table from Platform ${BUNDLED_FEE_TABLE.tag} is still in use.`;
+    message = `Couldn’t read the fee source from GitHub. ${inUse} Try again shortly.`;
   }
   refreshStatus();
   ui.setBusy(false, message);
@@ -193,7 +197,7 @@ function takeDraft(): Draft | null {
     const raw = sessionStorage.getItem(DRAFT_KEY);
     sessionStorage.removeItem(DRAFT_KEY);
     const draft = raw ? JSON.parse(raw) as Draft : null;
-    return draft && draft.to === network && draft.from !== network && typeof draft.json === 'string' ? draft : null;
+    return draft && draft.to === network && typeof draft.from === 'string' && draft.from !== network && typeof draft.json === 'string' ? draft : null;
   } catch {
     return null;
   }
