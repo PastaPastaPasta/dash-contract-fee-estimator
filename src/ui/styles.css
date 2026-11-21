@@ -40,6 +40,8 @@ a { color: var(--dh-brand-ink); }
 .fee-tool .dh-input[type=number] { max-width: 240px; }
 .fee-tool .dh-field__error:empty { display: none; }
 .fee-tool td { overflow-wrap: anywhere; }
+.fee-tool td.num { overflow-wrap: normal; white-space: nowrap; }
+.fee-tool [hidden] { display: none !important; }
 #protocol-status.fee-warn { color: var(--dh-ink); border-left: 3px solid var(--dh-warn); padding-left: 8px; }
 
 .fee-details { max-width: 860px; margin-top: 20px; padding-block: 12px; border-top: 1px solid var(--dh-line); }

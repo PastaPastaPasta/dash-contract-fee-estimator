@@ -46,7 +46,7 @@ export function renderPlan(
     </div>
     <div class="dh-section__head"><h2 class="dh-section__title" id="fee-activity-title">Plan your document activity</h2></div>
     <p>Set the monthly creates and updates for each document type in this contract.</p>
-    ${types.length === 0 ? '<p>This contract has no document types. Token activity needs a separate budget; enter a manual reserve below.</p>' : ''}
+    ${types.length === 0 ? '<p>This contract has no document types, so the suggested reserve is zero. Token activity needs its own budget; enter it as a manual reserve below.</p>' : ''}
     ${types.map(({ name, mutable }, i) => `
       <fieldset class="fee-activity" data-type="${i}">
         <legend>${esc(name)}</legend>
@@ -90,7 +90,7 @@ export function renderPlan(
   const useSuggested = container.querySelector<HTMLButtonElement>('#use-suggested')!;
 
   function update() {
-    let monthly: number | null = types.length ? 0 : null;
+    let monthly: number | null = 0;
     container.querySelectorAll<HTMLElement>('.fee-activity').forEach((fieldset, i) => {
       const { name, mutable } = types[i];
       const values = activity.get(name)!;
