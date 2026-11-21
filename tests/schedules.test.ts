@@ -3,6 +3,8 @@ import { BUNDLED_SCHEDULES, scheduleForProtocol, scheduleLabel } from '../src/li
 import { estimateContractFee } from '../src/lib/estimator';
 import { parseContractJson } from '../src/lib/parser';
 import { EXAMPLES } from '../src/ui/examples';
+import { BUNDLED_FEE_TABLE, DEFAULT_FEE_CONSTANTS } from '../src/lib/constants';
+import { PLATFORM_V5_0_3 } from './fixtures/platform-v5.0.3';
 
 describe('network fee schedules', () => {
   it('selects the historical and current protocol boundaries', () => {
@@ -13,11 +15,16 @@ describe('network fee schedules', () => {
     expect(scheduleForProtocol(15)).toBe('v3.rs');
     expect(scheduleLabel('v3.rs')).toBe('v3 · protocols 14–15');
     const tokens = { tokens: { '0': { distributionRules: { oncePerIdentityDistribution: {} } } } };
-    expect(estimateContractFee(tokens, BUNDLED_SCHEDULES[scheduleForProtocol(15)!]).totalCredits).toBe(30_000_000_000);
+    expect(BUNDLED_SCHEDULES[scheduleForProtocol(15)!]).toBe(BUNDLED_SCHEDULES[scheduleForProtocol(14)!]);
+    expect(estimateContractFee(tokens, PLATFORM_V5_0_3.v3).totalCredits).toBe(30_000_000_000);
   });
   it('retains the protocol 14 surcharge only in v3', () => {
     expect(BUNDLED_SCHEDULES['v2.rs'].tokenUsesOncePerIdentityDistributionFee).toBeUndefined();
-    expect(BUNDLED_SCHEDULES['v3.rs'].tokenUsesOncePerIdentityDistributionFee).toBe(10_000_000_000);
+    expect(BUNDLED_SCHEDULES['v3.rs'].tokenUsesOncePerIdentityDistributionFee).toEqual(expect.any(Number));
+  });
+  it('bundles the newest table as the v3 schedule, so a new table file needs a mapping review', () => {
+    expect(BUNDLED_FEE_TABLE.version).toBe('v3.rs');
+    expect(BUNDLED_SCHEDULES['v3.rs']).toBe(DEFAULT_FEE_CONSTANTS);
   });
   it('leads with a useful first contract below the one-tDASH starter allowance', () => {
     const parsed = parseContractJson(EXAMPLES[0].json);

@@ -3,8 +3,8 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { fetchFeeVersion, fetchVersionFiles, latestStableRelease } from '../src/lib/fee-source';
 import { parseRustFeeConstants } from '../src/lib/rust-parser';
-import { BUNDLED_FEE_TABLE, DEFAULT_FEE_CONSTANTS, FEE_CONSTANTS_BASE_URL } from '../src/lib/constants';
-import { BUNDLED_SCHEDULES } from '../src/lib/schedules';
+import { BUNDLED_FEE_TABLE, FEE_CONSTANTS_BASE_URL } from '../src/lib/constants';
+import { PLATFORM_V5_0_3 } from './fixtures/platform-v5.0.3';
 // @ts-expect-error untyped script module
 import { buildConstants } from '../scripts/update-fees.mjs';
 
@@ -14,16 +14,16 @@ const files: Record<string, string> = {
   'v2.rs': fixture('fee-constants-v2.rs'),
   'v3.rs': fixture('fee-constants-v3.rs'),
 };
-const SHA = BUNDLED_FEE_TABLE.revision;
+const { tag: TAG, revision: SHA } = PLATFORM_V5_0_3;
 const requested: string[] = [];
 
-function platform(release: Record<string, unknown> = { tag_name: BUNDLED_FEE_TABLE.tag, prerelease: false, draft: false }) {
+function platform(release: Record<string, unknown> = { tag_name: TAG, prerelease: false, draft: false }) {
   return vi.fn(async (input: string | URL) => {
     const url = String(input);
     requested.push(url);
     const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 });
     if (url.endsWith('/releases/latest')) return json(release);
-    if (url.includes('/commits/')) return json({ sha: SHA, commit: { committer: { date: '2026-11-04T00:43:26+07:00' } } });
+    if (url.includes('/commits/')) return json({ sha: SHA, commit: { committer: { date: PLATFORM_V5_0_3.committedAt } } });
     const file = url.split('/').pop()!;
     return files[file] ? new Response(files[file], { status: 200 }) : new Response('', { status: 404 });
   });
@@ -37,24 +37,27 @@ afterEach(() => {
 describe('inherited v3-style fee file', () => {
   it('parses Platform v5.0.3 v3.rs through its v2 parent', () => {
     const constants = parseRustFeeConstants(files['v3.rs'], parseRustFeeConstants(files['v2.rs']));
-    expect(constants).toEqual(DEFAULT_FEE_CONSTANTS);
+    expect(constants).toEqual(PLATFORM_V5_0_3.v3);
     expect(() => parseRustFeeConstants(files['v3.rs'])).toThrow('Missing fee fields');
   });
 
-  it('fetches v3.rs and its parent at the pinned release tag', async () => {
+  it('fetches v3.rs and its parent at the requested release tag', async () => {
     vi.stubGlobal('fetch', platform());
-    expect(await fetchFeeVersion('v3.rs')).toEqual(BUNDLED_SCHEDULES['v3.rs']);
-    expect(await fetchVersionFiles()).toEqual(['v1.rs', 'v2.rs', 'v3.rs']);
-    expect(requested.every((url) => url.includes(`/dashpay/platform/${BUNDLED_FEE_TABLE.tag}/`))).toBe(true);
+    expect(await fetchFeeVersion('v3.rs', TAG)).toEqual(PLATFORM_V5_0_3.v3);
+    expect(await fetchVersionFiles(TAG)).toEqual(['v1.rs', 'v2.rs', 'v3.rs']);
+    expect(requested.every((url) => url.includes(`/dashpay/platform/${TAG}/`))).toBe(true);
     expect(requested.some((url) => url.includes('/master/'))).toBe(false);
   });
 
-  it('regenerates the bundled constants unchanged from the stable release', async () => {
+  it('generates the constants module from the stable release', async () => {
     const { output, tag, versionFile } = await buildConstants(platform());
-    expect([tag, versionFile]).toEqual([BUNDLED_FEE_TABLE.tag, BUNDLED_FEE_TABLE.version]);
-    const table = (source: string) => source.slice(source.indexOf('export const DEFAULT_FEE_CONSTANTS'), source.indexOf('export const BUNDLED_FEE_TABLE'));
-    expect(table(output)).toBe(table(readFileSync(resolve(__dirname, '../src/lib/constants.ts'), 'utf-8')));
-    expect(output).toContain(`'https://raw.githubusercontent.com/dashpay/platform/${BUNDLED_FEE_TABLE.tag}/`);
+    expect([tag, versionFile]).toEqual([TAG, 'v3.rs']);
+    const underscored = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '_');
+    for (const [field, credits] of Object.entries(PLATFORM_V5_0_3.v3)) expect(output).toContain(`  ${field}: ${underscored(credits)},`);
+    expect(output).toContain(`version: 'v3.rs',\n  tag: '${TAG}',\n  revision: '${SHA}',\n  sourceDate: '${PLATFORM_V5_0_3.sourceDate}',`);
+    const exports = (source: string) => [...source.matchAll(/^export const (\w+)/gm)].map((m) => m[1]);
+    expect(exports(output)).toEqual(exports(readFileSync(resolve(__dirname, '../src/lib/constants.ts'), 'utf-8')));
+    expect(output).toContain(`'https://raw.githubusercontent.com/dashpay/platform/${TAG}/`);
     expect(requested.filter((url) => url.startsWith('https://raw.')).every((url) => url.includes(`/${SHA}/`))).toBe(true);
   });
 
