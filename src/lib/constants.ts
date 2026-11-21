@@ -1,6 +1,6 @@
 import type { FeeConstants } from './types';
 
-/** Bundled fee constants (v3.rs) - auto-updated by CI */
+/** Bundled fee constants (v3.rs, Platform v5.0.3) - auto-updated by CI */
 export const DEFAULT_FEE_CONSTANTS: FeeConstants = {
   baseContractRegistrationFee: 10_000_000_000, // 0.1 Dash
   documentTypeRegistrationFee: 2_000_000_000, // 0.02 Dash
@@ -16,14 +16,17 @@ export const DEFAULT_FEE_CONSTANTS: FeeConstants = {
 
 export const BUNDLED_FEE_TABLE = {
   version: 'v3.rs',
-  revision: 'a75650f105274b7335eadc2d26bf08939673d084',
-  sourceDate: '27 Oct 2026',
+  tag: 'v5.0.3',
+  revision: '5e9aff1c4835299773095494a7a1c53506d5b0f9',
+  sourceDate: '3 Nov 2026',
 };
 
-/** Base directory URL for fee constant source files in DPP */
+export const FEE_CONSTANTS_PATH = 'packages/rs-platform-version/src/version/fee/data_contract_registration';
+
+/** Raw fee files at the pinned Platform release */
 export const FEE_CONSTANTS_BASE_URL =
-  'https://raw.githubusercontent.com/dashpay/platform/master/packages/rs-platform-version/src/version/fee/data_contract_registration';
+  'https://raw.githubusercontent.com/dashpay/platform/v5.0.3/packages/rs-platform-version/src/version/fee/data_contract_registration';
 
 /** GitHub blob URL for linking to source (not raw) */
 export const FEE_CONSTANTS_BLOB_BASE_URL =
-  'https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration';
+  'https://github.com/dashpay/platform/blob/v5.0.3/packages/rs-platform-version/src/version/fee/data_contract_registration';

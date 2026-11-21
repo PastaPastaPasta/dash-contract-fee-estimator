@@ -20,12 +20,12 @@ export const BUNDLED_SCHEDULES: Record<string, FeeConstants> = {
 };
 
 export function scheduleForProtocol(protocol: number): string | null {
-  if (!Number.isInteger(protocol) || protocol < 1 || protocol > 14) return null;
+  if (!Number.isInteger(protocol) || protocol < 1 || protocol > 15) return null;
   return protocol >= 14 ? 'v3.rs' : protocol >= 9 ? 'v2.rs' : 'v1.rs';
 }
 
 export function scheduleLabel(version: string): string {
-  return version === 'v3.rs' ? 'v3 · protocol 14' : version === 'v2.rs' ? 'v2 · protocols 9–13' : version === 'v1.rs' ? 'v1 · protocols 1–8 (historical)' : `${version} · applicability unconfirmed`;
+  return version === 'v3.rs' ? 'v3 · protocols 14–15' : version === 'v2.rs' ? 'v2 · protocols 9–13' : version === 'v1.rs' ? 'v1 · protocols 1–8 (historical)' : `${version} · applicability unconfirmed`;
 }
 
 export async function readCurrentProtocol(network: string): Promise<number> {

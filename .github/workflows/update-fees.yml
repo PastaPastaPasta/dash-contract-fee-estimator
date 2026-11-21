@@ -19,18 +19,26 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Fetch and update fee constants
+      - name: Read fee constants from the latest stable Platform release
+        id: fees
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/update-fees.mjs
       - name: Check for changes
         id: diff
         run: |
-          git diff --exit-code src/lib/constants.ts || echo "changed=true" >> $GITHUB_OUTPUT
+          git diff --exit-code src/lib/constants.ts || echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Test against the new constants
+        if: steps.diff.outputs.changed == 'true'
+        run: npx tsc --noEmit && npx vitest run
       - name: Create PR with updated constants
         if: steps.diff.outputs.changed == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          title: 'chore: update fee constants from DPP source'
-          commit-message: 'chore: update fee constants from DPP source'
-          body: 'Automated update of fee constants from rs-platform-version source.'
+          title: 'chore: update fee constants to Platform ${{ steps.fees.outputs.tag }}'
+          commit-message: 'chore: update fee constants to Platform ${{ steps.fees.outputs.tag }}'
+          body: |
+            Fee constants regenerated from the latest stable dashpay/platform release, `${{ steps.fees.outputs.tag }}`.
+            Check `scheduleForProtocol` in `src/lib/schedules.ts` if this release adds a protocol version, and refresh `tests/fixtures/fee-constants-*.rs` from the same tag.
           branch: auto/update-fee-constants
           delete-branch: true

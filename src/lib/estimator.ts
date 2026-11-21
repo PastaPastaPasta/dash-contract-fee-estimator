@@ -16,7 +16,7 @@ export function estimateContractFee(
 ): FeeEstimate {
   const parsed = isParsedContract(contract) ? contract : parseContractJson(contract);
   if (parsed.tokens.some((token) => token.hasOncePerIdentityDistribution) && !constants.tokenUsesOncePerIdentityDistributionFee) {
-    throw new Error('Once-per-identity distribution requires the v3 fee table (protocol 14). Refresh the fee table or select v3.');
+    throw new Error('Once-per-identity distribution requires the v3 fee table (protocol 14 and later). Select v3.');
   }
   const lineItems: FeeLineItem[] = [];
 
@@ -113,7 +113,7 @@ export function estimateContractFee(
     const oncePerIdentityCount = parsed.tokens.filter((t) => t.hasOncePerIdentityDistribution).length;
     if (oncePerIdentityCount > 0) {
       const fee = constants.tokenUsesOncePerIdentityDistributionFee!;
-      lineItems.push({ label: 'Once-per-identity distribution', description: 'Per token using once-per-identity distribution (protocol 14)', count: oncePerIdentityCount, unitCostCredits: fee, totalCostCredits: oncePerIdentityCount * fee });
+      lineItems.push({ label: 'Once-per-identity distribution', description: 'Per token using once-per-identity distribution (from protocol 14)', count: oncePerIdentityCount, unitCostCredits: fee, totalCostCredits: oncePerIdentityCount * fee });
     }
     if (preProgrammedCount > 0) {
       lineItems.push({
