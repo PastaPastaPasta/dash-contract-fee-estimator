@@ -77,3 +77,5 @@ a { color: var(--dh-brand-ink); }
   .fee-activity-fields { grid-template-columns: 1fr; }
 }
 @media (pointer: coarse) { .fee-tool .dh-textarea { font-size: 16px; } }
+#network-notice { margin-bottom: 16px; }
+#network-notice[hidden], .fee-result[hidden] { display: none; }

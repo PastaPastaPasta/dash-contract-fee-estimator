@@ -9,6 +9,10 @@ import type { FeeConstants } from './lib/types';
 import { renderApp, type FeeSource, type Handoff } from './ui/components';
 import { BUNDLED_SCHEDULES, readCurrentProtocol, scheduleForProtocol, scheduleLabel } from './lib/schedules';
 import { EXAMPLES } from './ui/examples';
+import { planState, restorePlan, type PlanState } from './ui/plan';
+
+const DRAFT_KEY = 'fees-network-draft';
+type Draft = { from: string; to: string; json: string; plan: PlanState };
 
 window.dashhq.network.canonicalize();
 const params = new URLSearchParams(location.search);
@@ -177,9 +181,36 @@ ui.contractForm.addEventListener('submit', async (event) => {
   }
 });
 
+function keepDraft(to: string) {
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ from: network, to, json: ui.getJsonInput(), plan: planState() } satisfies Draft));
+  } catch { /* storage unavailable: the switch still works, without the draft */ }
+}
+document.addEventListener('dashhq-network', (event) => keepDraft((event as CustomEvent<{ network: string }>).detail.network));
+
+function takeDraft(): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    sessionStorage.removeItem(DRAFT_KEY);
+    const draft = raw ? JSON.parse(raw) as Draft : null;
+    return draft && draft.to === network && draft.from !== network && typeof draft.json === 'string' ? draft : null;
+  } catch {
+    return null;
+  }
+}
+
 const contractParam = params.get('contract') ?? params.get('contractId');
+const draft = takeDraft();
 refreshStatus();
-if (contractParam) {
+if (draft) {
+  ui.setJsonInput(draft.json);
+  ui.setExample(null);
+  restorePlan(draft.plan);
+  ui.showNetworkNotice(() => {
+    keepDraft(draft.from);
+    location.assign(window.dashhq.network.withNetwork(location.href, draft.from as typeof network));
+  });
+} else if (contractParam) {
   ui.contractInput.value = contractParam;
   ui.contractDetails.open = true;
   ui.contractForm.requestSubmit();

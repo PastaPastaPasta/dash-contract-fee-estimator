@@ -7,6 +7,14 @@ const activity = new Map<string, Activity>();
 let months = '3';
 let manualReserve: string | null = null;
 
+export type PlanState = { activity: [string, Activity][]; months: string; manualReserve: string | null };
+export const planState = (): PlanState => ({ activity: [...activity], months, manualReserve });
+export function restorePlan(state: PlanState) {
+  for (const [name, values] of state.activity) activity.set(name, values);
+  months = state.months;
+  manualReserve = state.manualReserve;
+}
+
 const headline = (value: number) =>
   value > 0 && value < 0.001 ? '< 0.001' : value.toLocaleString('en-US', { maximumFractionDigits: 3 });
 

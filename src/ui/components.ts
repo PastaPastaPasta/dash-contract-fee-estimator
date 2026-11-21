@@ -33,6 +33,10 @@ export function renderApp(container: HTMLElement, network: string, identity: str
         <p class="dh-page-header__lede">See what a data contract costs to register on Platform, plan the reserve its documents need, then take the schema to Bridge.</p>
         ${identity ? `<p><a class="dh-link" href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, family))}">Return to your identity in Explorer →</a></p>` : ''}
       </header>
+      <div id="network-notice" class="dh-notice dh-notice--info" role="status" hidden>
+        <p>Switched to ${esc(networkLabel)}. Your JSON, activity and reserve are kept; estimate again for this network.</p>
+        <button class="dh-btn" type="button" id="undo-network">Undo network change</button>
+      </div>
       <form id="estimate-form" class="dh-form" novalidate>
         <div class="dh-field">
           <label class="dh-field__label" for="example-select">Start with an example</label>
@@ -137,6 +141,10 @@ export function renderApp(container: HTMLElement, network: string, identity: str
     contractButton: $<HTMLButtonElement>('#load-contract'),
     contractDetails: $<HTMLDetailsElement>('#contract-details'),
     setContractStatus: (message: string) => { $('#contract-status').textContent = message; },
+    showNetworkNotice: (undo: () => void) => {
+      $('#network-notice').hidden = false;
+      $('#undo-network').addEventListener('click', undo);
+    },
     hasResult: () => !resultSection.hidden,
     getJsonInput: () => jsonInput.value,
     setJsonInput: (value: string) => { jsonInput.value = value; },
