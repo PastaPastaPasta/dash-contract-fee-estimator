@@ -23,7 +23,7 @@
     "build:all": "npm run build && npm run build:lib",
     "prepare": "npm run build:lib",
     "preview": "vite preview",
-    "test": "node --test retirement.test.mjs && vitest"
+    "test": "vitest"
   },
   "devDependencies": {
     "typescript": "^5.3.0",

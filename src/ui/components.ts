@@ -1,267 +1,219 @@
 import type { FeeEstimate, ParsedContract } from '../lib/types';
-import { creditsToDash, formatCredits } from './formatter';
+import { CREDITS_PER_DASH } from '../lib/types';
 import { scheduleLabel } from '../lib/schedules';
 import { EXAMPLES } from './examples';
 import { BUNDLED_FEE_TABLE } from '../lib/constants';
-import { encodeContractHandoff } from '../lib/contract-source';
+import { feeBlobUrl } from '../lib/fee-source';
+import { esc, number } from './formatter';
+import { renderPlan } from './plan';
 
-function esc(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+export type FeeSource = { version: string; ref: string; live: boolean; fetchedAt?: string };
+export type Handoff = { href: string } | { reason: string };
+
+const CALCULATION_URL = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.tag}/packages/rs-dpp/src/data_contract/methods/registration_cost/v2/mod.rs`;
+const UPDATE_COST_URL = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.tag}/packages/rs-drive-abci/src/execution/types/execution_event/mod.rs`;
+const DOCS_URL = 'https://docs.dash.org/projects/platform/en/stable/docs/explanations/fees.html';
+
+export function describeSource(source: FeeSource): string {
+  const table = `Fee table ${scheduleLabel(source.version)}`;
+  if (source.live) return `${table} · read from Platform ${source.ref} at ${source.fetchedAt} UTC.`;
+  return `${table} · bundled from Platform ${BUNDLED_FEE_TABLE.tag} (${BUNDLED_FEE_TABLE.revision.slice(0, 7)}, ${BUNDLED_FEE_TABLE.sourceDate}).`;
 }
 
-export function renderApp(container: HTMLElement): {
-  getJsonInput: () => string;
-  setProtocolStatus: (message: string) => void;
-  setJsonInput: (val: string) => void;
-  showResult: (estimate: FeeEstimate, parsed: ParsedContract) => void;
-  showError: (msg: string) => void;
-  clearResult: () => void;
-  setFeeSource: (source: 'live' | 'bundled', versionFile?: string, sourceUrl?: string) => void;
-  setVersionOptions: (versions: string[], selected: string) => void;
-  onRefresh: (handler: () => void) => void;
-  setRefreshState: (loading: boolean, message?: string) => void;
-  revealResult: () => void;
-  onEstimate: (handler: () => void) => void;
-  onExampleSelect: (handler: (index: number) => void) => void;
-  onVersionSelect: (handler: (versionFile: string) => void) => void;
-} {
-  const params = new URLSearchParams(window.location.search);
-  const network = params.get('network') ?? 'mainnet';
-  const rawIdentity = params.get('identity');
-  const identity = rawIdentity && /^[1-9A-HJ-NP-Za-km-z]{43,44}$/.test(rawIdentity) ? rawIdentity : null;
+export function renderApp(container: HTMLElement, network: string, identity: string | null) {
   const unit = network === 'mainnet' ? 'DASH' : network === 'testnet' ? 'tDASH' : 'devnet DASH';
   const networkLabel = network === 'testnet' ? 'Testnet' : network === 'mainnet' ? 'Mainnet' : network;
-  const bundledSource = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.revision}/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs`;
-  const sourceDescription = `Fee table: v2 · protocols 9–13 · bundled source ${BUNDLED_FEE_TABLE.sourceDate} (${BUNDLED_FEE_TABLE.revision.slice(0, 7)}).`;
+  const family = network === 'mainnet' || network === 'testnet' ? { network: network as 'mainnet' | 'testnet' } : undefined;
+
   container.innerHTML = `
-    <header class="dh-page-header">
-
-      <h1 class="dh-page-header__title">Estimate contract fees</h1>
-      <p class="dh-page-header__lede">See what a data contract costs to register on Platform. JSON is processed here; Continue to Bridge carries it to the registration flow.</p>
-      ${identity ? `<p class="dh-field__help">Continue from <a href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, { network: network as 'mainnet' | 'testnet' }))}">your identity in Explorer →</a>. Estimate registration, plan a reserve, then review in Bridge.</p>` : ''}
-    </header>
-    <div id="fee-source-notice" class="fee-source dh-notice dh-notice--info">
-      <p id="fee-source-description">${sourceDescription}</p>
-      <p id="protocol-status" role="status">Reading current protocol…</p>
-      <div class="fee-source-actions">
-        <button class="dh-btn" id="refresh-fees" type="button">Refresh protocol and fee source</button>
-        <label class="dh-field__label visually-hidden" for="version-select">Fee table version</label>
-        <select class="dh-select" id="version-select" disabled><option value="v2.rs">v2 · protocols 9–13</option></select>
-        <a id="fee-source-link" href="${bundledSource}" target="_blank" rel="noopener">View source ↗</a>
-      </div>
-      <p id="refresh-message" role="status"></p>
-    </div>
-
-    <section class="input-section dh-card">
-      <form id="load-contract-form" class="contract-loader dh-field">
-        <label class="dh-field__label" for="contract-id">Existing contract ID (base58)</label>
-        <div class="dh-inline-form"><input class="dh-input dh-input--mono" aria-describedby="contract-status" id="contract-id" autocomplete="off" spellcheck="false" required placeholder="Paste a contract ID from Explorer"><button class="dh-btn" id="load-contract" type="submit">Load contract</button></div>
-        <p id="contract-status" role="status" class="dh-field__help">Optional: load a public schema from ${esc(networkLabel)}, or paste JSON below.</p>
-      </form>
-      <div class="input-header">
-        <label class="dh-field__label" for="json-input">Data contract JSON</label>
-        <div class="input-actions">
-          <select class="dh-select" id="example-select" aria-label="Load an example">
-            <option value="">Load an example…</option>
-            ${EXAMPLES.map((e, i) => `<option value="${i}">${e.name}</option>`).join('')}
+    <div class="platform-band fee-form-band">
+      <header class="dh-page-header">
+        <p class="dh-page-header__kicker">Platform tools</p>
+        <h1 class="dh-page-header__title">Fee estimator</h1>
+        <p class="dh-page-header__lede">See what a data contract costs to register on Platform, plan the reserve its documents need, then take the schema to Bridge.</p>
+        ${identity ? `<p><a class="dh-link" href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, family))}">Return to your identity in Explorer →</a></p>` : ''}
+      </header>
+      <form id="estimate-form" class="dh-form" novalidate>
+        <div class="dh-field">
+          <label class="dh-field__label" for="example-select">Start with an example</label>
+          <select class="dh-select" id="example-select">
+            <option value="">Your own contract</option>
+            ${EXAMPLES.map((e, i) => `<option value="${i}">${esc(e.name)}</option>`).join('')}
           </select>
         </div>
-      </div>
-      <textarea class="dh-textarea dh-input--mono" id="json-input" rows="16" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{
-  "documentSchemas": {
-    "myDocument": {
-      "type": "object",
-      "indices": [
-        { "name": "byField", "properties": [{ "field": "asc" }], "unique": true }
-      ],
-      "properties": {
-        "field": { "type": "string" }
-      }
-    }
-  }
-}'></textarea>
-      <p id="json-hint" class="dh-field__help">Paste a contract or choose an example. Estimates cover registration fees; processing and storage costs are additional.</p>
-      <div class="input-footer">
-        <button class="dh-btn dh-btn--primary" id="estimate-btn">Estimate fees</button>
-        <span id="error-msg" class="dh-field__error" role="alert"></span>
-      </div>
-    </section>
+        <div class="dh-field">
+          <label class="dh-field__label" for="json-input">Data contract JSON</label>
+          <textarea class="dh-textarea dh-input--mono" id="json-input" rows="9" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{ "documentSchemas": { "note": { "type": "object", "properties": { "text": { "type": "string" } } } } }'></textarea>
+          <p id="json-hint" class="dh-field__help">Paste a contract or choose an example. JSON is processed in this browser.</p>
+        </div>
+        <div class="dh-actions">
+          <button class="dh-btn dh-btn--primary" id="estimate-btn" type="submit">Estimate fees</button>
+          <p class="dh-field__help" id="protocol-status" role="status">Checking which protocol ${esc(networkLabel)} runs…</p>
+        </div>
+        <div class="dh-field__error" id="error-msg" role="alert"></div>
+      </form>
+    </div>
 
-    <section id="result-section" class="result-section dh-card hidden" tabindex="-1" aria-labelledby="result-title">
-      <h2 class="dh-section__title" id="result-title">Registration estimate</h2>
-      <div id="estimate-total" class="dh-stat dh-stat--key" role="status"></div>
-      <p id="estimate-protocol" class="dh-notice dh-notice--info"></p>
-      <p id="estimate-source" class="dh-field__help">${sourceDescription}</p>
-      <p class="dh-field__help">Itemised registration fees in ${unit}.</p>
-      <table class="dh-table dh-table--stack">
-        <thead>
-          <tr>
-            <th>Item</th>
-            <th class="num">Count</th>
-            <th class="num">Unit (${unit})</th>
-            <th class="num">Total (${unit})</th>
-          </tr>
-        </thead>
-        <tbody id="fee-tbody"></tbody>
-        <tfoot id="fee-tfoot"></tfoot>
-      </table>
+    <details class="dh-disclosure fee-details" id="contract-details">
+      <summary><span>Load an existing contract</span></summary>
+      <form id="load-contract-form" class="dh-field">
+        <label class="dh-field__label" for="contract-id">Contract ID on ${esc(networkLabel)}</label>
+        <div class="dh-inline-form"><input class="dh-input dh-input--mono" aria-describedby="contract-status" id="contract-id" autocomplete="off" spellcheck="false" required placeholder="Base58 contract ID"><button class="dh-btn" id="load-contract" type="submit">Load contract</button></div>
+        <p id="contract-status" role="status" class="dh-field__help">Reads the public schema from ${esc(networkLabel)} and puts it in the JSON field.</p>
+      </form>
+    </details>
 
-      <div id="summary-section" class="summary-section"></div>
-      <div class="budget-section">
-        <h3 class="dh-h3">Plan the funding</h3>
-        <p>The registration estimate is the minimum component. Processing depends on the final transition and signatures; storage depends on bytes and retention. Later document writes, tokens and name contests cost extra. An existing contract’s original registration is already paid.</p>
-        <label class="dh-field__label" for="planned-reserve">Your additional reserve (${unit})</label>
-        <input class="dh-input" aria-describedby="funding-plan" id="planned-reserve" type="number" min="0" step="0.0001" inputmode="decimal" placeholder="Choose a reserve">
-        <p id="funding-plan" class="dh-field__help" role="status">Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.</p>
-        <p class="dh-field__help">Next: import this schema into Bridge, choose your identity, then request its current transition estimate before funding or signing. Budget for that quote plus the writes your app will make; there is no universal reserve. ${network === 'mainnet' ? 'Mainnet · real DASH.' : 'Testnet · practice funds have no monetary value.'}</p>
-        <a id="register-contract" class="dh-btn dh-btn--primary" aria-disabled="true">Continue to Bridge on ${esc(networkLabel)} →</a>
+    <details class="dh-disclosure fee-details" id="source-details">
+      <summary><span>Schedule, sources and historical estimates</span></summary>
+      <p id="fee-source-description"></p>
+      <p id="schedule-status" role="status"></p>
+      <div class="dh-field">
+        <label class="dh-field__label" for="version-select">Fee schedule</label>
+        <select class="dh-select" id="version-select"></select>
+        <p class="dh-field__help">Bundled tables come from Platform ${BUNDLED_FEE_TABLE.tag}, the newest stable release when this site was built. Historical schedules are comparisons, not current funding quotes.</p>
       </div>
+      <div class="dh-actions">
+        <button class="dh-btn" id="refresh-fees" type="button">Refresh protocol and fee source</button>
+        <a id="fee-source-link" target="_blank" rel="noopener">Fee constants ↗</a>
+      </div>
+      <p id="refresh-message" role="status"></p>
+      <p class="dh-sources dh-meta">
+        <span><a href="${CALCULATION_URL}" target="_blank" rel="noopener">Calculation logic ↗</a></span>
+        <span><a href="${DOCS_URL}" target="_blank" rel="noopener">Fee documentation ↗</a></span>
+      </p>
+    </details>
 
-      <p class="dh-elsewhere"><a href="${window.dashhq.href('explorer', '/', { network: network as 'mainnet' | 'testnet' })}">Explorer</a><span>·</span><a href="${window.dashhq.href('dapi', '/', { network: network as 'mainnet' | 'testnet' })}">DAPI console →</a></p>
-      <div class="sources-section">
-        <h3 class="dh-h3">Fee reference</h3>
-        <table class="dh-table dh-table--cards">
-          <thead>
-            <tr>
-              <th>Fee type</th>
-              <th class="num">Credits</th>
-              <th class="num">${unit}</th>
-            </tr>
-          </thead>
+    <section id="result-section" class="fee-result dh-section" tabindex="-1" aria-labelledby="result-title" hidden>
+      <div class="dh-section__head"><h2 class="dh-section__title" id="result-title">Registration estimate</h2></div>
+      <div id="estimate-total" class="dh-stat dh-stat--key"></div>
+      <p class="fee-scope">Registration fee only: storage and processing fees for the transition are extra. A contract update pays the full registration fee of the updated contract again. <a href="${UPDATE_COST_URL}" target="_blank" rel="noopener">Why ↗</a></p>
+      <p class="dh-sources dh-meta" id="estimate-meta"></p>
+      <div class="fee-items">
+        <h3 class="dh-h3">Registration itemisation</h3>
+        <div class="fee-cost-bar" id="cost-bar" role="img" aria-label="Registration cost breakdown; exact amounts follow in the table"></div>
+        <table class="dh-table dh-table--stack">
+          <caption class="dh-sr">Itemised registration costs</caption>
+          <thead><tr><th>Item</th><th class="num">Operations</th><th class="num">Credits</th><th class="num">${unit}</th></tr></thead>
+          <tbody id="fee-tbody"></tbody>
+        </table>
+        <p class="dh-field__help" id="contract-summary"></p>
+      </div>
+      <div id="plan" class="dh-section" aria-labelledby="fee-activity-title"></div>
+      <details class="dh-disclosure fee-details">
+        <summary><span>Full fee reference</span></summary>
+        <table class="dh-table dh-table--stack">
+          <thead><tr><th>Fee type</th><th class="num">Credits</th><th class="num">${unit}</th></tr></thead>
           <tbody id="constants-tbody"></tbody>
         </table>
-
-      </div>
+      </details>
     </section>
+    <p class="dh-elsewhere"><a href="${esc(window.dashhq.href('explorer', '/', family))}">Explorer</a><span>·</span><a href="${esc(window.dashhq.href('dapi', '/', family))}">DAPI console →</a></p>
   `;
-  document.querySelector('dashhq-footer')!.innerHTML = `        <div class="source-links">
-          <span>Sources:</span>
-          <a id="fee-constants-link" href="https://github.com/dashpay/platform/blob/master/packages/rs-platform-version/src/version/fee/data_contract_registration/v2.rs" target="_blank" rel="noopener">Fee constants (v2.rs)</a>
-          <a href="https://github.com/dashpay/platform/blob/master/packages/rs-dpp/src/data_contract/methods/registration_cost/v1/mod.rs" target="_blank" rel="noopener">Calculation logic (rs-dpp)</a>
-          <a href="https://docs.dash.org/projects/platform/en/stable/docs/explanations/fees.html" target="_blank" rel="noopener">Fee documentation</a>
-        </div>`;
+  document.querySelector('dashhq-footer')!.innerHTML = `<div class="source-links">
+      <span>Sources:</span>
+      <a id="fee-constants-link" target="_blank" rel="noopener"></a>
+      <a href="${CALCULATION_URL}" target="_blank" rel="noopener">Calculation logic (rs-dpp)</a>
+      <a href="${DOCS_URL}" target="_blank" rel="noopener">Fee documentation</a>
+    </div>`;
 
+  const $ = <T extends HTMLElement>(selector: string) => container.querySelector<T>(selector)!;
+  const jsonInput = $<HTMLTextAreaElement>('#json-input');
+  const errorMsg = $('#error-msg');
+  const resultSection = $('#result-section');
+  const estimateBtn = $<HTMLButtonElement>('#estimate-btn');
+  const exampleSelect = $<HTMLSelectElement>('#example-select');
+  const refreshBtn = $<HTMLButtonElement>('#refresh-fees');
+  const versionSelect = $<HTMLSelectElement>('#version-select');
+  const feeConstantsLink = document.querySelector<HTMLAnchorElement>('#fee-constants-link')!;
 
-  const jsonInput = container.querySelector<HTMLTextAreaElement>('#json-input')!;
-  const errorMsg = container.querySelector<HTMLSpanElement>('#error-msg')!;
-  const resultSection = container.querySelector<HTMLElement>('#result-section')!;
-  const feeTbody = container.querySelector<HTMLTableSectionElement>('#fee-tbody')!;
-  const feeTfoot = container.querySelector<HTMLTableSectionElement>('#fee-tfoot')!;
-  const summarySection = container.querySelector<HTMLElement>('#summary-section')!;
-  const constantsTbody = container.querySelector<HTMLTableSectionElement>('#constants-tbody')!;
-  const estimateBtn = container.querySelector<HTMLButtonElement>('#estimate-btn')!;
-  const exampleSelect = container.querySelector<HTMLSelectElement>('#example-select')!;
-  const feeDescription = container.querySelector<HTMLElement>('#fee-source-description')!;
-  const refreshBtn = container.querySelector<HTMLButtonElement>('#refresh-fees')!;
-  const refreshMessage = container.querySelector<HTMLElement>('#refresh-message')!;
-  const versionSelect = container.querySelector<HTMLSelectElement>('#version-select')!;
-  const feeSourceLink = container.querySelector<HTMLAnchorElement>('#fee-source-link')!;
-  versionSelect.dataset.activeVersion = 'v2.rs';
-  const feeConstantsLink = document.querySelector<HTMLAnchorElement>('#fee-constants-link');
-  if (feeConstantsLink) { feeConstantsLink.href = bundledSource; feeConstantsLink.textContent = 'Fee constants (v2.rs)'; }
-  let registrationDash = 0;
-  const reserve = container.querySelector<HTMLInputElement>('#planned-reserve')!;
-  reserve.addEventListener('input', () => {
-    const amount = Number(reserve.value);
-    container.querySelector('#funding-plan')!.textContent = reserve.value && Number.isFinite(amount) && amount >= 0
-      ? `Planned funding: ${(registrationDash + amount).toLocaleString('en-US', { maximumFractionDigits: 8 })} ${unit} = registration + your ${amount} ${unit} reserve. Actual transaction costs may differ.`
-      : 'Choose a reserve for processing, storage and future writes. This is a planning allowance, not a fee quote.';
-  });
+  const hideResult = () => {
+    resultSection.hidden = true;
+    estimateBtn.classList.add('dh-btn--primary');
+  };
 
   return {
-    setProtocolStatus: (message: string) => {
-      container.querySelector('#protocol-status')!.textContent = message;
-      container.querySelector('#estimate-protocol')!.textContent = message;
-      const unconfirmed = /unconfirmed|not confirmed|hypothetical|provisional|unavailable|couldn.t|unknown|reading/i.test(message);
-      for (const notice of container.querySelectorAll('#estimate-protocol, #fee-source-notice')) {
-        notice.classList.toggle('dh-notice--warn', unconfirmed);
-        notice.classList.toggle('dh-notice--info', !unconfirmed);
-      }
-    },
+    contractForm: $<HTMLFormElement>('#load-contract-form'),
+    contractInput: $<HTMLInputElement>('#contract-id'),
+    contractButton: $<HTMLButtonElement>('#load-contract'),
+    contractDetails: $<HTMLDetailsElement>('#contract-details'),
+    setContractStatus: (message: string) => { $('#contract-status').textContent = message; },
+    hasResult: () => !resultSection.hidden,
     getJsonInput: () => jsonInput.value,
-    setJsonInput: (val: string) => { jsonInput.value = val; },
-    showResult: (estimate: FeeEstimate, parsed: ParsedContract) => {
+    setJsonInput: (value: string) => { jsonInput.value = value; },
+    setStatus: (message: string, warn: boolean) => {
+      $('#protocol-status').textContent = message;
+      $('#schedule-status').textContent = message;
+      $('#protocol-status').classList.toggle('fee-warn', warn);
+    },
+    setSource: (source: FeeSource) => {
+      const url = feeBlobUrl(source.live ? source.ref : BUNDLED_FEE_TABLE.revision, source.version);
+      $('#fee-source-description').textContent = describeSource(source);
+      $<HTMLAnchorElement>('#fee-source-link').href = url;
+      feeConstantsLink.href = url;
+      feeConstantsLink.textContent = `Fee constants (${source.version})`;
+    },
+    setVersionOptions: (versions: string[], selected: string) => {
+      versionSelect.innerHTML = `<option value="">Current network schedule (automatic)</option>` +
+        versions.map((v) => `<option value="${esc(v)}">${esc(scheduleLabel(v))}</option>`).join('');
+      versionSelect.value = selected;
+    },
+    setBusy: (busy: boolean, message?: string) => {
+      refreshBtn.disabled = busy;
+      versionSelect.disabled = busy;
+      refreshBtn.setAttribute('aria-busy', String(busy));
+      refreshBtn.textContent = busy ? 'Reading GitHub…' : 'Refresh protocol and fee source';
+      if (message !== undefined) $('#refresh-message').textContent = message;
+    },
+    showError: (message: string) => {
+      errorMsg.textContent = message;
+      jsonInput.setAttribute('aria-invalid', 'true');
+      hideResult();
+    },
+    clearResult: () => {
       errorMsg.textContent = '';
       jsonInput.removeAttribute('aria-invalid');
-      resultSection.classList.remove('hidden');
-      registrationDash = estimate.totalDash;
-      reserve.dispatchEvent(new Event('input'));
-      const bridgeLink = container.querySelector<HTMLAnchorElement>('#register-contract')!;
-      const encoded = encodeContractHandoff(jsonInput.value);
+      hideResult();
+    },
+    showResult: (estimate: FeeEstimate, parsed: ParsedContract, source: Record<string, unknown>, meta: string[], sourceUrl: string, handoff: Handoff) => {
+      errorMsg.textContent = '';
+      jsonInput.removeAttribute('aria-invalid');
+      resultSection.hidden = false;
       estimateBtn.classList.remove('dh-btn--primary');
-      if (encoded.length <= 24000 && (network === 'mainnet' || network === 'testnet')) {
-        bridgeLink.removeAttribute('aria-disabled');
-        bridgeLink.href = window.dashhq.href('bridge', '/?mode=contract&from=fees&feeSchedule=' + encodeURIComponent(versionSelect.dataset.activeVersion ?? '') + '&registrationCredits=' + estimate.totalCredits + '&contract=' + encoded + (identity ? '&identity=' + encodeURIComponent(identity) : ''), { network });
-        bridgeLink.textContent = `Continue to Bridge on ${networkLabel} →`;
-      } else {
-        bridgeLink.removeAttribute('href');
-        bridgeLink.setAttribute('aria-disabled', 'true');
-        estimateBtn.classList.add('dh-btn--primary');
-        bridgeLink.textContent = 'Open Bridge from the family menu and paste this schema. It is too large for a link, or this network needs its own Bridge.';
-      }
-      container.querySelector('#estimate-total')!.innerHTML = `<strong class="dh-stat__value">${creditsToDash(estimate.totalCredits)} <span class="dh-unit">${unit}</span></strong><p class="dh-stat__note">${formatCredits(estimate.totalCredits)} credits · registration only</p>`;
-
-      feeTbody.innerHTML = estimate.lineItems
-        .map((item) => `
-          <tr>
-            <td data-label="Item" class="dh-rc-title">
-              <span class="item-label">${esc(item.label)}</span>
-              <span class="item-desc">${esc(item.description)}</span>
-            </td>
-            <td class="num" data-label="Count">${item.count}</td>
-            <td class="num" data-label="Unit · ${unit}">${creditsToDash(item.unitCostCredits)}</td>
-            <td class="num" data-label="Total · ${unit}">${creditsToDash(item.totalCostCredits)}</td>
-          </tr>
-        `)
+      $('#estimate-total').innerHTML = `<strong class="dh-stat__value">${number(estimate.totalDash)} <span class="dh-unit">${unit}</span></strong><p class="dh-stat__note">${number(estimate.totalCredits)} credits · registration only</p>`;
+      $('#estimate-meta').innerHTML = meta.map((m) => `<span>${esc(m)}</span>`).join('') +
+        `<span><a href="${esc(sourceUrl)}" target="_blank" rel="noopener">Source ↗</a></span>`;
+      const ramp = (i: number) => `var(--dh-ramp-${(i % 5) + 1})`;
+      $('#cost-bar').innerHTML = estimate.lineItems
+        .map((item, i) => item.totalCostCredits > 0
+          ? `<span style="flex-grow:${(item.totalCostCredits / estimate.totalCredits) * 100};background:${ramp(i)}" title="${esc(item.label)}: ${number(item.totalCostCredits)} credits"></span>`
+          : '')
         .join('');
+      $('#fee-tbody').innerHTML = estimate.lineItems.map((item, i) => `
+        <tr>
+          <td class="dh-rc-title" data-label="Item"><span class="fee-cost-key" aria-hidden="true" style="background:${ramp(i)}"></span>${esc(item.label)}
+            <small class="fee-item-note">${esc(item.description)} · ${number(item.unitCostCredits)} credits per operation</small></td>
+          <td class="num" data-label="Operations">${number(item.count)}</td>
+          <td class="num" data-label="Credits">${number(item.totalCostCredits)}</td>
+          <td class="num" data-label="${unit}">${number(item.totalCostCredits / CREDITS_PER_DASH)}</td>
+        </tr>`).join('');
+      const indexes = parsed.documentTypes.reduce((sum, type) => sum + type.indexes.length, 0);
+      const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+      $('#contract-summary').textContent = [
+        plural(parsed.documentTypes.length, 'document type', 'document types'),
+        plural(indexes, 'index', 'indexes'),
+        plural(parsed.tokens.length, 'token', 'tokens'),
+        plural(parsed.keywords.length, 'keyword', 'keywords'),
+      ].join(' · ');
 
-      feeTfoot.innerHTML = `
-        <tr class="total-row">
-          <td data-label="Item" class="dh-rc-hide"><strong>Total</strong></td>
-          <td class="num dh-rc-hide" data-label="Count"></td>
-          <td class="num dh-rc-hide" data-label="Unit"></td>
-          <td class="num" data-label="Total">
-            <div><strong>${creditsToDash(estimate.totalCredits)} ${unit}</strong>
-            <span class="credits-display">${formatCredits(estimate.totalCredits)} credits</span></div>
-          </td>
-        </tr>
-      `;
-
-      const uniqueCount = parsed.documentTypes.reduce(
-        (sum, dt) => sum + dt.indexes.filter((i) => i.unique && !i.contested).length, 0,
-      );
-      const nonUniqueCount = parsed.documentTypes.reduce(
-        (sum, dt) => sum + dt.indexes.filter((i) => !i.unique && !i.contested).length, 0,
-      );
-      const contestedCount = parsed.documentTypes.reduce(
-        (sum, dt) => sum + dt.indexes.filter((i) => i.contested).length, 0,
-      );
-      const totalIndexes = uniqueCount + nonUniqueCount + contestedCount;
-
-      const indexParts = [
-        uniqueCount > 0 ? `${uniqueCount} unique` : '',
-        nonUniqueCount > 0 ? `${nonUniqueCount} non-unique` : '',
-        contestedCount > 0 ? `${contestedCount} contested` : '',
-      ].filter(Boolean).join(', ');
-
-      summarySection.innerHTML = `
-        <h3 class="dh-h3">Contract summary</h3>
-        <ul>
-          <li>${parsed.documentTypes.length} document type${parsed.documentTypes.length !== 1 ? 's' : ''}${
-            parsed.documentTypes.length > 0
-              ? ` (${parsed.documentTypes.map((d) => esc(d.name)).join(', ')})`
-              : ''
-          }</li>
-          <li>${totalIndexes} index${totalIndexes !== 1 ? 'es' : ''}${indexParts ? ` (${indexParts})` : ''}</li>
-          <li>${parsed.tokens.length} token${parsed.tokens.length !== 1 ? 's' : ''}</li>
-          <li>${parsed.keywords.length} keyword${parsed.keywords.length !== 1 ? 's' : ''}${
-            parsed.keywords.length > 0 ? ` (${parsed.keywords.map((k) => esc(k)).join(', ')})` : ''
-          }</li>
-        </ul>
-      `;
+      const action = document.createElement('div');
+      action.className = 'fee-handoff';
+      action.innerHTML = 'href' in handoff
+        ? `<p>Import this schema into Bridge to review its current transition quote.</p><a id="register-contract" class="dh-btn dh-btn--primary" href="${esc(handoff.href)}">Continue to Bridge on ${esc(networkLabel)} →</a>`
+        : `<p class="dh-notice dh-notice--info" id="register-contract">${esc(handoff.reason)}</p>`;
+      renderPlan($('#plan'), parsed, source, estimate.totalDash, unit, action);
 
       const c = estimate.constants;
-      const constRows: [string, number][] = [
+      const rows: [string, number | undefined][] = [
         ['Base contract registration', c.baseContractRegistrationFee],
         ['Document type registration', c.documentTypeRegistrationFee],
         ['Non-unique index', c.documentTypeBaseNonUniqueIndexRegistrationFee],
@@ -270,90 +222,39 @@ export function renderApp(container: HTMLElement): {
         ['Token registration', c.tokenRegistrationFee],
         ['Perpetual distribution', c.tokenUsesPerpetualDistributionFee],
         ['Pre-programmed distribution', c.tokenUsesPreProgrammedDistributionFee],
+        ['Once-per-identity distribution', c.tokenUsesOncePerIdentityDistributionFee],
         ['Search keyword', c.searchKeywordFee],
       ];
-      if (c.tokenUsesOncePerIdentityDistributionFee !== undefined) constRows.push(['Once-per-identity distribution', c.tokenUsesOncePerIdentityDistributionFee]);
-      constantsTbody.innerHTML = constRows
+      $('#constants-tbody').innerHTML = rows
+        .filter((row): row is [string, number] => row[1] !== undefined)
         .map(([label, credits]) => `
           <tr>
             <td data-label="Fee type" class="dh-rc-title">${esc(label)}</td>
-            <td class="num" data-label="Credits">${formatCredits(credits)}</td>
-            <td class="num" data-label="${unit}">${creditsToDash(credits)}</td>
-          </tr>
-        `)
+            <td class="num" data-label="Credits">${number(credits)}</td>
+            <td class="num" data-label="${unit}">${number(credits / CREDITS_PER_DASH)}</td>
+          </tr>`)
         .join('');
-    },
-    showError: (msg: string) => {
-      errorMsg.textContent = msg;
-      jsonInput.setAttribute('aria-invalid', 'true');
-      resultSection.classList.add('hidden');
-      estimateBtn.classList.add('dh-btn--primary');
-    },
-    clearResult: () => {
-      resultSection.classList.add('hidden');
-      estimateBtn.classList.add('dh-btn--primary');
-      errorMsg.textContent = '';
-      jsonInput.removeAttribute('aria-invalid');
-    },
-    setFeeSource: (source: 'live' | 'bundled', versionFile?: string, sourceUrl?: string) => {
-      versionSelect.dataset.activeVersion = versionFile ?? '';
-      versionSelect.value = versionFile ?? '';
-      const pinned = `https://github.com/dashpay/platform/blob/${BUNDLED_FEE_TABLE.revision}/packages/rs-platform-version/src/version/fee/data_contract_registration/${versionFile}`;
-      if (source === 'bundled') sourceUrl = pinned;
-      feeDescription.textContent = source === 'live'
-        ? `Fee table: ${scheduleLabel(versionFile ?? '')} · source ref master · fetched ${new Date().toISOString().replace('T', ' ').slice(0, 19)} UTC.`
-        : `Fee table: ${scheduleLabel(versionFile ?? '')} · bundled source ${BUNDLED_FEE_TABLE.sourceDate} (${BUNDLED_FEE_TABLE.revision.slice(0, 7)}).`;
-      container.querySelector('#estimate-source')!.textContent = feeDescription.textContent;
-      if (sourceUrl) {
-        feeSourceLink.href = sourceUrl;
-      }
-      if (versionFile && feeConstantsLink) {
-        feeConstantsLink.textContent = `Fee constants (${versionFile})`;
-        if (sourceUrl) feeConstantsLink.href = sourceUrl;
-      }
-    },
-    setVersionOptions: (versions: string[], selected: string) => {
-      versionSelect.innerHTML = versions
-        .map((v) => {
-          const label = scheduleLabel(v);
-          const isSelected = v === selected ? ' selected' : '';
-          return `<option value="${esc(v)}"${isSelected}>${esc(label)}</option>`;
-        })
-        .join('');
-      versionSelect.disabled = false;
-    },
-    onRefresh: (handler: () => void) => { refreshBtn.addEventListener('click', handler); },
-    setRefreshState: (loading: boolean, message = '') => {
-      refreshBtn.disabled = loading;
-      refreshBtn.setAttribute('aria-busy', String(loading));
-      if (!loading) versionSelect.value = versionSelect.dataset.activeVersion ?? '';
-      versionSelect.disabled = loading || !versionSelect.querySelector('option[value$=".rs"]');
-      refreshBtn.textContent = loading ? 'Reading GitHub…' : 'Refresh protocol and fee source';
-      refreshMessage.textContent = message;
     },
     revealResult: () => {
-      if (!resultSection.classList.contains('hidden')) {
-        resultSection.focus({ preventScroll: true });
-        resultSection.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
-      } else jsonInput.focus();
+      if (resultSection.hidden) { jsonInput.focus(); return; }
+      resultSection.focus({ preventScroll: true });
+      resultSection.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
     },
     onEstimate: (handler: () => void) => {
-      estimateBtn.addEventListener('click', handler);
+      $('#estimate-form').addEventListener('submit', (event) => { event.preventDefault(); handler(); });
     },
     onExampleSelect: (handler: (index: number) => void) => {
-      exampleSelect.addEventListener('change', () => {
-        const val = exampleSelect.value;
-        if (val !== '') {
-          handler(Number(val));
-          exampleSelect.value = '';
-        }
-      });
+      exampleSelect.addEventListener('change', () => { if (exampleSelect.value !== '') handler(Number(exampleSelect.value)); });
     },
+    onJsonEdit: (handler: () => void) => {
+      jsonInput.addEventListener('input', () => { exampleSelect.value = ''; handler(); });
+    },
+    setExample: (index: number | null) => { exampleSelect.value = index === null ? '' : String(index); },
     onVersionSelect: (handler: (versionFile: string) => void) => {
-      versionSelect.addEventListener('change', () => {
-        const val = versionSelect.value;
-        if (val) handler(val);
-      });
+      versionSelect.addEventListener('change', () => handler(versionSelect.value));
     },
+    onRefresh: (handler: () => void) => { refreshBtn.addEventListener('click', handler); },
   };
 }
+
+export type Ui = ReturnType<typeof renderApp>;
