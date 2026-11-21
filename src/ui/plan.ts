@@ -119,7 +119,7 @@ export function renderPlan(
       : 'Enter a reserve of zero or more.';
   }
 
-  container.addEventListener('input', (event) => {
+  container.oninput = (event) => {
     const input = event.target as HTMLInputElement;
     const fieldset = input.closest<HTMLElement>('.fee-activity');
     if (fieldset) {
@@ -128,7 +128,7 @@ export function renderPlan(
     } else if (input.id === 'fee-months') months = input.value;
     else if (input.id === 'fee-reserve') manualReserve = input.value;
     update();
-  });
+  };
   useSuggested.addEventListener('click', () => {
     manualReserve = null;
     update();
