@@ -27,7 +27,6 @@ export function renderApp(container: HTMLElement, network: string, identity: str
 
   container.innerHTML = `
       <header class="dh-page-header fee-head">
-        <p class="dh-page-header__kicker">Platform tools</p>
         <h1 class="dh-page-header__title">Fee estimator</h1>
         <p class="dh-page-header__lede">See what a data contract costs to register on Platform, plan the reserve its documents need, then take the schema to Bridge.</p>
         ${identity ? `<p><a class="dh-link" href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, family))}">Return to your identity in Explorer →</a></p>` : ''}
@@ -70,7 +69,7 @@ export function renderApp(container: HTMLElement, network: string, identity: str
     </details>
 
     <details class="dh-disclosure fee-details" id="source-details">
-      <summary><span>Schedule, sources and historical estimates</span></summary>
+      <summary><span>Schedule and sources</span></summary>
       <p id="fee-source-description"></p>
       <p id="schedule-status" role="status"></p>
       <div class="dh-field">
@@ -88,6 +87,14 @@ export function renderApp(container: HTMLElement, network: string, identity: str
         <span><a href="${DOCS_URL}" target="_blank" rel="noopener">Fee documentation ↗</a></span>
       </p>
     </details>
+    <section class="fee-how" aria-labelledby="fee-how-title">
+      <h2 class="dh-h3" id="fee-how-title">What you get</h2>
+      <ol>
+        <li><span><b>The registration fee</b> for this contract, item by item.</span></li>
+        <li><span><b>A reserve plan</b> for the documents you expect to write.</span></li>
+        <li><span><b>A handoff to Bridge</b> to register it with a funded identity.</span></li>
+      </ol>
+    </section>
     <p class="dh-elsewhere"><a href="${esc(window.dashhq.href('explorer', '/', family))}">Explorer</a><span>·</span><a href="${esc(window.dashhq.href('dapi', '/', family))}">DAPI console →</a></p>
     </aside>
     </div>
