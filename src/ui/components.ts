@@ -26,18 +26,19 @@ export function renderApp(container: HTMLElement, network: string, identity: str
   const family = network === 'mainnet' || network === 'testnet' ? { network: network as 'mainnet' | 'testnet' } : undefined;
 
   container.innerHTML = `
-    <div class="platform-band fee-form-band">
-      <header class="dh-page-header">
+      <header class="dh-page-header fee-head">
         <p class="dh-page-header__kicker">Platform tools</p>
         <h1 class="dh-page-header__title">Fee estimator</h1>
         <p class="dh-page-header__lede">See what a data contract costs to register on Platform, plan the reserve its documents need, then take the schema to Bridge.</p>
         ${identity ? `<p><a class="dh-link" href="${esc(window.dashhq.href('explorer', '/identity/?id=' + identity, family))}">Return to your identity in Explorer →</a></p>` : ''}
       </header>
+    <div class="fee-layout">
+    <div class="fee-main">
       <div id="network-notice" class="dh-notice dh-notice--info" role="status" hidden>
         <p>Switched to ${esc(networkLabel)}. Your JSON, activity and reserve are kept; estimate again for this network.</p>
         <button class="dh-btn" type="button" id="undo-network">Undo network change</button>
       </div>
-      <form id="estimate-form" class="dh-form" novalidate>
+      <form id="estimate-form" class="dh-form dh-card dh-card--key" novalidate>
         <div class="dh-field">
           <label class="dh-field__label" for="example-select">Start with an example</label>
           <select class="dh-select" id="example-select">
@@ -47,7 +48,7 @@ export function renderApp(container: HTMLElement, network: string, identity: str
         </div>
         <div class="dh-field">
           <label class="dh-field__label" for="json-input">Data contract JSON</label>
-          <textarea class="dh-textarea dh-input--mono" id="json-input" rows="9" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{ "documentSchemas": { "note": { "type": "object", "properties": { "text": { "type": "string" } } } } }'></textarea>
+          <textarea class="dh-textarea dh-input--mono" id="json-input" rows="11" spellcheck="false" aria-describedby="json-hint error-msg" placeholder='{ "documentSchemas": { "note": { "type": "object", "properties": { "text": { "type": "string" } } } } }'></textarea>
           <p id="json-hint" class="dh-field__help">Paste a contract or choose an example. JSON is processed in this browser.</p>
         </div>
         <div class="dh-actions">
@@ -58,6 +59,7 @@ export function renderApp(container: HTMLElement, network: string, identity: str
       </form>
     </div>
 
+    <aside class="fee-aside" aria-label="Other ways in">
     <details class="dh-disclosure fee-details" id="contract-details">
       <summary><span>Load an existing contract</span></summary>
       <form id="load-contract-form" class="dh-field">
@@ -86,6 +88,9 @@ export function renderApp(container: HTMLElement, network: string, identity: str
         <span><a href="${DOCS_URL}" target="_blank" rel="noopener">Fee documentation ↗</a></span>
       </p>
     </details>
+    <p class="dh-elsewhere"><a href="${esc(window.dashhq.href('explorer', '/', family))}">Explorer</a><span>·</span><a href="${esc(window.dashhq.href('dapi', '/', family))}">DAPI console →</a></p>
+    </aside>
+    </div>
 
     <section id="result-section" class="fee-result dh-section" tabindex="-1" aria-labelledby="result-title" hidden>
       <div class="dh-section__head"><h2 class="dh-section__title" id="result-title">Registration estimate</h2></div>
@@ -111,12 +116,11 @@ export function renderApp(container: HTMLElement, network: string, identity: str
         </table>
       </details>
     </section>
-    <p class="dh-elsewhere"><a href="${esc(window.dashhq.href('explorer', '/', family))}">Explorer</a><span>·</span><a href="${esc(window.dashhq.href('dapi', '/', family))}">DAPI console →</a></p>
   `;
   document.querySelector('dashhq-footer')!.innerHTML = `<div class="source-links">
       <span>Sources:</span>
-      <a id="fee-constants-link" target="_blank" rel="noopener"></a>
-      <a href="${CALCULATION_URL}" target="_blank" rel="noopener">Calculation logic (rs-dpp)</a>
+      <a id="fee-constants-link" target="_blank" rel="noopener">Fee table</a>
+      <a href="${CALCULATION_URL}" target="_blank" rel="noopener">Calculation logic</a>
       <a href="${DOCS_URL}" target="_blank" rel="noopener">Fee documentation</a>
     </div>`;
 
@@ -148,9 +152,9 @@ export function renderApp(container: HTMLElement, network: string, identity: str
     hasResult: () => !resultSection.hidden,
     getJsonInput: () => jsonInput.value,
     setJsonInput: (value: string) => { jsonInput.value = value; },
-    setStatus: (message: string, warn: boolean) => {
+    setStatus: (message: string, warn: boolean, detail: string = message) => {
       $('#protocol-status').textContent = message;
-      $('#schedule-status').textContent = message;
+      $('#schedule-status').textContent = detail;
       $('#protocol-status').classList.toggle('fee-warn', warn);
     },
     setSource: (source: FeeSource) => {
@@ -158,7 +162,8 @@ export function renderApp(container: HTMLElement, network: string, identity: str
       $('#fee-source-description').textContent = describeSource(source);
       $<HTMLAnchorElement>('#fee-source-link').href = url;
       feeConstantsLink.href = url;
-      feeConstantsLink.textContent = `Fee constants (${source.version})`;
+      feeConstantsLink.textContent = 'Fee table';
+      feeConstantsLink.title = `Fee constants, ${scheduleLabel(source.version)}`;
     },
     setVersionOptions: (versions: string[], selected: string) => {
       versionSelect.innerHTML = `<option value="">Current network schedule (automatic)</option>` +
