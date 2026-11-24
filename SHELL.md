@@ -1,5 +1,5 @@
-Vendored dashhq shell 1.9.5 (runtime files only) from the family design release, revision ca49a31cedb71a593a81a21fac9938979c1499a7.
+Vendored dashhq shell 2.0.0 (runtime files only) from the family design release, revision ec94ac4096bde7f3501deae99672a2acd54e3893.
 
-`public/dashhq/dashhq-shell.js` SHA-256: `1f298d9f46f8ea0b68f5b927597f4a8e312768bcf47ddc94fd9d7cf161d835ce`.
+`public/dashhq/dashhq-shell.js` SHA-256: `50ce06677bb4465641cdbd1ae9ff1fd02dd4b4b6b531dbb2b9f79c5168b1a6f5`.
 
 The vendored files are unchanged. The component contract is `shell/README.md` in the design repository.

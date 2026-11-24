@@ -40,16 +40,16 @@ const confirmed = () => !manual && !!current();
 
 function refreshStatus() {
   const schedule = current();
-  const [message, warn] = manual
+  const [message, warn, detail] = manual
     ? [`Hypothetical · ${scheduleLabel(manual)}, chosen by hand. ${schedule ? `${networkLabel} runs protocol ${protocol}, which uses ${scheduleLabel(schedule)}. ` : ''}Choose the automatic schedule before funding.`, true]
     : schedule
-      ? [`${networkLabel} · protocol ${protocol} (read ${protocolReadAt} UTC) · current schedule ${scheduleLabel(schedule)}`, false]
+      ? [`Priced with ${networkLabel}’s current fees.`, false, `${networkLabel} · protocol ${protocol} (read ${protocolReadAt} UTC) · current schedule ${scheduleLabel(schedule)}`]
       : protocolError
-        ? [`Couldn’t check ${networkLabel}’s protocol, so ${scheduleLabel(selected())} is provisional. Refresh in Schedule and sources before funding.`, true]
+        ? [`Couldn’t reach ${networkLabel} to confirm its current fees, so this estimate uses the bundled ${selected().replace(/\.rs$/, '')} schedule and may be out of date. Refresh it in Schedule and sources before you fund anything.`, true, `${networkLabel} · protocol not read · ${scheduleLabel(selected())}`]
         : protocol !== null
-          ? [`${networkLabel} reports protocol ${protocol}, which has no confirmed schedule here. ${scheduleLabel(selected())} is provisional; choose a schedule in Schedule and sources for comparison.`, true]
+          ? [`${networkLabel} runs protocol ${protocol}, which this tool has no fee schedule for yet, so this estimate may be off. It uses the ${selected().replace(/\.rs$/, '')} schedule; compare others in Schedule and sources.`, true, `${networkLabel} · protocol ${protocol} · ${scheduleLabel(selected())}`]
           : [`Checking which protocol ${networkLabel} runs…`, false];
-  ui.setStatus(message, warn);
+  ui.setStatus(message as string, warn as boolean, (detail ?? message) as string);
   ui.setSource(tableFor(selected()).source);
   ui.setVersionOptions(versions, manual);
 }

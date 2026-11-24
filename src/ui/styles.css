@@ -1,12 +1,3 @@
-:root {
-  --fees-platform: #25B8A6;
-  --fees-platform-soft: #DCF4F1;
-}
-:root[data-theme="dark"] { --fees-platform-soft: #103A40; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --fees-platform-soft: #103A40; }
-}
-
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--dh-page); color: var(--dh-ink); font: 15px/1.5 var(--dh-font); }
 a { color: var(--dh-brand-ink); }
@@ -15,28 +6,24 @@ a { color: var(--dh-brand-ink); }
 
 .dh-page.fee-tool { padding-top: 0; }
 .fee-tool a:not(.dh-btn) { text-decoration: underline; text-underline-offset: 3px; }
-.platform-band {
-  --fees-band: color-mix(in srgb, var(--fees-platform-soft) 100%, var(--dh-page));
-  position: relative;
-  isolation: isolate;
-  background: var(--fees-band);
-  border-bottom: 1px solid var(--dh-line);
-}
-.platform-band::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: var(--fees-band);
-  box-shadow: 0 0 0 100vmax var(--fees-band);
-  clip-path: inset(0 -100vmax 0 -100vmax);
-}
-.fee-form-band { padding-block: 32px 28px; }
-.fee-form-band > * { max-width: var(--dh-w-narrow); }
-.fee-form-band .dh-page-header { margin-bottom: 20px; }
+.fee-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px 32px; align-items: start; }
+.fee-main { min-width: 0; }
+.fee-tool .fee-head { margin-bottom: 20px; padding-top: 32px; }
+.fee-tool .fee-head .dh-page-header__lede { max-width: 72ch; }
+.fee-aside { display: grid; gap: 12px; min-width: 0; }
+.fee-aside .fee-details { margin: 0; padding: 4px 16px 12px; background: var(--dh-surface); border: 1px solid var(--dh-line); border-radius: var(--dh-r3); }
+.fee-aside .fee-details[open] { padding-bottom: 16px; }
+.fee-aside .dh-elsewhere { margin: 4px 0 0; }
+.fee-how { padding: 16px; border: 1px solid var(--dh-line); border-radius: var(--dh-r3); }
+.fee-how ol { display: grid; gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; counter-reset: fee-how; }
+.fee-how li { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; font-size: 14px; color: var(--dh-ink-2); counter-increment: fee-how; }
+.fee-how li::before { content: counter(fee-how); display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--dh-chip); color: var(--dh-ink); font-size: 13px; font-weight: 600; }
+.fee-how b { color: var(--dh-ink); font-weight: 600; }
+.fee-tool #estimate-form { max-width: none; padding: 20px 24px; }
+@media (max-width: 960px) { .fee-layout { grid-template-columns: minmax(0, 1fr); } }
 .fee-tool .dh-form { gap: 14px; }
 .fee-tool .dh-select, .fee-tool .dh-textarea { width: 100%; }
-.fee-tool .dh-textarea { min-height: 220px; font: 13px/1.5 var(--dh-mono); resize: vertical; tab-size: 2; }
+.fee-tool .dh-textarea { min-height: 0; height: auto; padding-bottom: 0; font: 13px/1.5 var(--dh-mono); resize: vertical; tab-size: 2; background: var(--dh-inset); }
 .fee-tool .dh-input[type=number] { max-width: 240px; }
 .fee-tool .dh-field__error:empty { display: none; }
 .fee-tool td { overflow-wrap: anywhere; }
@@ -44,14 +31,13 @@ a { color: var(--dh-brand-ink); }
 .fee-tool [hidden] { display: none !important; }
 #protocol-status.fee-warn { color: var(--dh-ink); border-left: 3px solid var(--dh-warn); padding-left: 8px; }
 
-.fee-details { max-width: 860px; margin-top: 20px; padding-block: 12px; border-top: 1px solid var(--dh-line); }
+.fee-details { max-width: 860px; margin-top: 20px; padding-block: 12px; }
 .fee-details > :not(summary) { margin-top: 14px; }
 .fee-details > summary { color: var(--dh-brand-ink); cursor: pointer; }
 #contract-id { flex: 1; }
 
 .fee-result { max-width: 860px; margin-top: 36px; scroll-margin-top: 80px; }
 .fee-result p { margin-block: 12px; }
-.fee-tool .dh-section__title { border-left: 4px solid var(--fees-platform); padding-left: 12px; }
 .fee-result .dh-stat { margin-block: 16px 8px; }
 .fee-scope { color: var(--dh-ink-2); font-size: var(--dh-fs-sm); }
 .fee-items { margin-top: 24px; }
@@ -69,16 +55,16 @@ a { color: var(--dh-brand-ink); }
 .fee-activity legend { font-weight: 600; padding-right: 8px; overflow-wrap: anywhere; }
 .fee-activity-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 
-.source-links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13px; }
+.source-links { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: var(--dh-fs-sm); }
 
 @media (max-width: 639px) {
-  .fee-form-band { padding-block: 20px; }
-  .fee-form-band .dh-page-header { margin-bottom: 14px; }
-  .fee-tool .dh-page-header__kicker, .fee-tool .dh-page-header__lede { display: none; }
-  .fee-tool .dh-textarea { min-height: 160px; }
+  .fee-tool .fee-head { margin-bottom: 14px; padding-top: 20px; }
+  .fee-tool .dh-page-header__kicker { display: none; }
+  .fee-tool .dh-textarea { height: calc(8lh + 8px); }
+  .fee-tool #estimate-form { padding: 16px; }
   .fee-activity-fields { grid-template-columns: 1fr; }
 }
 @media (pointer: coarse) { .fee-tool .dh-textarea { font-size: 16px; } }
 #network-notice { margin-bottom: 16px; }
 #network-notice[hidden], .fee-result[hidden] { display: none; }
-.platform-band + .fee-details { border-top: 0; }
+
